@@ -7,7 +7,7 @@ const fs = require('fs');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.resolve(__dirname, '..');
-const INDEX = path.join(ROOT, 'pramaan.html');
+const INDEX = path.join(ROOT, 'index.html');
 
 async function boot() {
   const html = fs.readFileSync(INDEX, 'utf8');

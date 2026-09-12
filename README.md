@@ -12,6 +12,10 @@ PRAMAAN (Sanskrit: *proof, evidence*) takes one suspicious email and answers the
 
 The prototype is a single HTML file. It ships with seven realistic sample emails and runs in any browser with no backend, no install and no network access.
 
+**Live demo:** https://brandmagis.me/pramaan/ · **Source:** https://github.com/thedhanrajsingh/pramaan
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222.svg)](https://brandmagis.me/pramaan/) [![SIH 26106](https://img.shields.io/badge/SIH-26106-orange.svg)](#why-this-exists)
+
 ![Overview screen](docs/screenshots/overview.png)
 
 ---
@@ -92,7 +96,7 @@ There are three ways to run it. Pick the first unless you have a reason not to.
 ### Option A: open the file (no install)
 
 1. Download or clone the repository.
-2. Double-click `pramaan.html`.
+2. Double-click `index.html`.
 
 Works in Chrome, Edge, Firefox and Safari. Everything is inline: fonts fall back to system faces if you are offline.
 
@@ -106,7 +110,7 @@ cd pramaan
 python -m http.server 8765
 ```
 
-Open http://localhost:8765/pramaan.html. Any static server works (`npx serve`, nginx, VS Code Live Server).
+Open http://localhost:8765/index.html. Any static server works (`npx serve`, nginx, VS Code Live Server).
 
 ### Option C: development setup
 
@@ -260,8 +264,8 @@ The dataset in `spec/data.js` is the contract between the console and the backen
 ## Project layout
 
 ```
-pramaan.html            the interface, standalone (open this)
-assemble.py             builds pramaan.html from spec/ + sections/
+index.html            the interface, standalone (open this)
+assemble.py             builds index.html from spec/ + sections/
 README.md               this file
 LICENSE                 MIT
 
@@ -354,3 +358,7 @@ Issues and pull requests are welcome. Keep a change to one screen or one spec fi
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+*Keywords: email threat detection, phishing detection, business email compromise (BEC), email forensics, email header analysis, Received header tracing, IP geolocation, lookalike domain detection, homoglyph, SPF DKIM DMARC alignment, explainable AI security, evidence chain of custody, blockchain anchoring, STIX 2.1, CERT-In incident reporting, SOC dashboard, Smart India Hackathon 2026, AICTE Cyber Security Cell.*
