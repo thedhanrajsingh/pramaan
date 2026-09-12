@@ -12,9 +12,9 @@ PRAMAAN (Sanskrit: *proof, evidence*) takes one suspicious email and answers the
 
 The prototype is a single HTML file. It ships with seven realistic sample emails and runs in any browser with no backend, no install and no network access.
 
-**Live demo:** https://brandmagis.me/pramaan/ · **Source:** https://github.com/thedhanrajsingh/pramaan
+**Live demo:** https://thedhanrajsingh.github.io/pramaan/ · **Source:** https://github.com/thedhanrajsingh/pramaan
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222.svg)](https://brandmagis.me/pramaan/) [![SIH 26106](https://img.shields.io/badge/SIH-26106-orange.svg)](#why-this-exists)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222.svg)](https://thedhanrajsingh.github.io/pramaan/) [![SIH 26106](https://img.shields.io/badge/SIH-26106-orange.svg)](#why-this-exists)
 
 ![Overview screen](docs/screenshots/overview.png)
 
