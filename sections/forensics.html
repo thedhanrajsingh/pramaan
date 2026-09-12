@@ -1,0 +1,493 @@
+<section class="screen" id="screen-forensics" hidden aria-labelledby="forensics-title">
+  <div class="screen__head">
+    <div>
+      <span class="eyebrow">Case &amp; custody</span>
+      <h2 class="screen__title" id="forensics-title">Forensic case &amp; evidence chain</h2>
+    </div>
+    <div class="row row--tight">
+      <a class="btn btn--ghost btn--sm" href="#forensics-cases-heading">Jump to recent cases</a>
+    </div>
+  </div>
+
+  <div class="stack">
+
+    <div id="forensics-case-card"></div>
+
+    <div class="grid-2">
+      <div class="card" id="forensics-timeline-card">
+        <div class="card-head">
+          <h3>Investigation timeline</h3>
+          <span class="eyebrow" id="forensics-timeline-count">0 events</span>
+        </div>
+        <ol class="timeline-rail" id="forensics-timeline" aria-live="polite"></ol>
+      </div>
+
+      <div class="card stripe stripe--accent" id="forensics-anchor-card">
+        <div class="card-head">
+          <h3>Blockchain anchor</h3>
+          <span class="pill pill--brass">Notarisation, not storage</span>
+        </div>
+        <p class="muted" style="margin-bottom:var(--s-3);">The chain head is anchored to an external ledger as proof-of-existence for the custody trail — the email itself is never written on-chain.</p>
+        <dl class="kv" id="forensics-anchor-kv"></dl>
+        <div class="row" style="margin-top:var(--s-4);">
+          <button type="button" class="btn btn--ghost" id="forensics-btn-anchor">Anchor to blockchain</button>
+          <span class="muted mono" id="forensics-anchor-state" style="font-size:var(--fs-xs);">Not yet anchored</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card--flush" id="forensics-ledger-card">
+      <div class="card-head">
+        <h3>Evidence ledger</h3>
+        <div class="row row--tight">
+          <span class="eyebrow" id="forensics-ledger-count">0 items</span>
+          <button type="button" class="btn btn--primary btn--sm" id="forensics-btn-verify">Verify chain</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="table" aria-describedby="forensics-verify-result">
+          <thead>
+            <tr>
+              <th scope="col" class="num">Seq</th>
+              <th scope="col">Item</th>
+              <th scope="col">SHA-256 of item</th>
+              <th scope="col">Prev hash</th>
+              <th scope="col" aria-hidden="true"></th>
+              <th scope="col">Chained hash</th>
+              <th scope="col">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="forensics-ledger-body"></tbody>
+        </table>
+      </div>
+      <div class="verify-result" id="forensics-verify-result" aria-live="polite">Chain not yet verified for this case.</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card card--flush" id="forensics-ioc-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Case IOC set</span>
+            <h3>Consolidated indicators</h3>
+          </div>
+          <button type="button" class="btn btn--ghost btn--sm" id="forensics-btn-ioc-csv">Export IOC set (CSV)</button>
+        </div>
+        <div id="forensics-ioc-body" aria-live="polite"></div>
+      </div>
+
+      <div class="card card--flush" id="forensics-campaign-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Infrastructure clustering</span>
+            <h3>Related campaigns</h3>
+          </div>
+          <span class="eyebrow" id="forensics-campaign-count">0 linked</span>
+        </div>
+        <div id="forensics-campaign-body" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Export &amp; action bar</h3>
+      </div>
+      <div class="row row--tight">
+        <button type="button" class="btn" id="forensics-btn-pdf">Generate PDF report</button>
+        <button type="button" class="btn" id="forensics-btn-json">Export JSON bundle</button>
+        <button type="button" class="btn" id="forensics-btn-stix">Export STIX 2.1 + CSV IOCs</button>
+        <button type="button" class="btn" id="forensics-btn-push">Push IOCs to gateway blocklist</button>
+        <button type="button" class="btn btn--danger" id="forensics-btn-cert">Escalate to CERT-In</button>
+      </div>
+      <p class="muted" id="forensics-custody-note" style="margin-top:var(--s-4); margin-bottom:0;"></p>
+    </div>
+
+    <div class="card card--flush">
+      <div class="card-head">
+        <h3 id="forensics-cases-heading">Recent cases</h3>
+        <span class="eyebrow">dashboard.recentCases</span>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Case</th>
+              <th scope="col">Linked email</th>
+              <th scope="col">Status</th>
+              <th scope="col">Assignee</th>
+              <th scope="col">Opened</th>
+            </tr>
+          </thead>
+          <tbody id="forensics-cases-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+#screen-forensics .empty{
+  background: var(--surface-sunk);
+  color: var(--text-muted);
+}
+#screen-forensics .empty--box{
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-3);
+  padding: var(--s-6);
+  text-align: center;
+}
+#screen-forensics .empty--box h3{ color: var(--text-2); margin-bottom: var(--s-2); }
+#screen-forensics .empty--strip{
+  margin: 0; padding: var(--s-5); font-size: var(--fs-sm);
+  border-top: 1px solid var(--border);
+}
+#screen-forensics .case-head-row{
+  display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap;
+}
+#screen-forensics .case-head-kv{ flex: 1 1 260px; }
+#screen-forensics .timeline-rail{
+  list-style: none; margin: 0; padding: 0 0 0 var(--s-4);
+  border-left: 1px solid var(--border);
+  margin-left: 6px;
+}
+#screen-forensics .timeline-item{
+  position: relative; padding: 0 0 var(--s-4) var(--s-4);
+  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--s-3);
+  align-items: baseline;
+}
+#screen-forensics .timeline-item:last-child{ padding-bottom: 0; }
+#screen-forensics .timeline-item::before{
+  content: ""; position: absolute; left: calc(-1 * var(--s-4) - 5px); top: 4px;
+  width: 9px; height: 9px; border-radius: var(--r-pill);
+  background: var(--brass); box-shadow: 0 0 0 3px var(--surface);
+}
+#screen-forensics .timeline-time, #screen-forensics .ioc-pct, #screen-forensics .ioc-src{
+  font-size: var(--fs-xs); color: var(--text-faint);
+}
+#screen-forensics .timeline-time{ white-space: nowrap; }
+#screen-forensics .timeline-event{ color: var(--text-2); font-size: var(--fs-sm); }
+#screen-forensics .ioc-val{ font-size: var(--fs-xs); max-width: 260px; word-break: break-all; }
+#screen-forensics .ioc-conf{ display: flex; align-items: center; gap: var(--s-2); white-space: nowrap; }
+#screen-forensics .ioc-meter{ width: 56px; min-width: 56px; }
+#screen-forensics .cmp-row{
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-5); border-top: 1px solid var(--border);
+}
+#screen-forensics .cmp-title{ margin-bottom: 4px; }
+#screen-forensics .cmp-name{ font-size: var(--fs-sm); color: var(--text-2); }
+#screen-forensics .cmp-meta{ font-size: var(--fs-xs); color: var(--text-muted); }
+#screen-forensics .cmp-meter{ width: 84px; }
+#screen-forensics .chain-arrow{ color: var(--brass); font-family: var(--font-mono); font-size: var(--fs-sm); text-align: center; }
+#screen-forensics .verify-result{
+  padding: var(--s-3) var(--s-5) var(--s-4); border-radius: var(--r-2);
+  border: 1px solid var(--border-strong); background: var(--surface-sunk);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-2);
+}
+#screen-forensics .verify-result.is-ok{ border-color: var(--sev-safe); color: var(--sev-safe); background: var(--sev-safe-wash); }
+#screen-forensics .verify-result.is-bad{ border-color: var(--sev-critical); color: var(--sev-critical); background: var(--sev-critical-wash); }
+#screen-forensics #forensics-anchor-state.is-anchored{ color: var(--brass); }
+</style>
+
+<script>(function(){
+  window.__screens = window.__screens || [];
+
+  var root = null;
+  var currentEmail = null;
+  var currentCase = null;
+  var GENESIS = '0'.repeat(64);
+
+  var STATUS_BADGE = {
+    'Open': 'badge--high',
+    'Awaiting vendor': 'badge--medium',
+    'Containment': 'badge--critical',
+    'Reported to CERT-In': 'badge--info',
+    'Closed': 'badge--safe'
+  };
+
+  function trunc(h){
+    return h.slice(0, 10) + '…' + h.slice(-6);
+  }
+
+  function statusBadgeClass(status){
+    return STATUS_BADGE[status] || 'badge--info';
+  }
+
+  function $(id){ return root.querySelector('#' + id); }
+
+  /* ---------------------------------------------------------- case header */
+  function renderCaseHeader(ctx, email, kase){
+    var host = $('forensics-case-card');
+    var esc = ctx.fmt.escapeHtml;
+    if (!kase){
+      host.innerHTML =
+        '<div class="card empty empty--box">' +
+          '<h3>No open case for ' + esc(email.id) + '</h3>' +
+          '<p class="muted" style="margin-bottom:var(--s-4);">' + esc(email.subject) + ' was analysed as <strong>' + esc(email.verdict) + '</strong> (score ' + esc(email.riskScore) + ') but no forensic case has been raised against it.</p>' +
+          '<button type="button" class="btn btn--primary" id="forensics-btn-opencase">Open case</button>' +
+        '</div>';
+      var btn = host.querySelector('#forensics-btn-opencase');
+      if (btn) btn.addEventListener('click', function(){
+        ctx.toast('A forensic case would be raised for ' + email.id + ' and assigned from the Tier-2 SOC queue.', 'Open case');
+      });
+      return;
+    }
+    var sev = ctx.fmt.severity(email.riskScore);
+    host.innerHTML =
+      '<div class="card stripe stripe--' + sev + '">' +
+        '<div class="card-head row--between">' +
+          '<div>' +
+            '<span class="eyebrow">Forensic case</span>' +
+            '<h3>' + esc(kase.caseId) + '</h3>' +
+          '</div>' +
+          '<span class="badge ' + statusBadgeClass(kase.status) + '"><span class="badge__dot"></span>' + esc(kase.status) + '</span>' +
+        '</div>' +
+        '<div class="case-head-row">' +
+          '<div class="score-ring score-ring--sm score-ring--' + sev + '" style="--ring-val:' + Number(email.riskScore) + ';">' +
+            '<span class="score-ring__val">' + esc(email.riskScore) + '</span>' +
+          '</div>' +
+          '<dl class="kv case-head-kv">' +
+            '<dt>Linked email</dt><dd>' + esc(email.id) + ' — ' + esc(email.subject) + '</dd>' +
+            '<dt>Verdict</dt><dd><span class="badge ' + ctx.fmt.badgeClass(email.verdict) + '">' + esc(email.verdict) + '</span> <span class="pill">' + esc(email.category) + '</span></dd>' +
+            '<dt>Assignee</dt><dd>' + esc(kase.assignee) + '</dd>' +
+            '<dt>Opened</dt><dd>' + esc(ctx.fmt.date(kase.openedAt)) + '</dd>' +
+          '</dl>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------ timeline */
+  function renderTimeline(ctx, timeline){
+    var list = $('forensics-timeline');
+    var count = $('forensics-timeline-count');
+    var esc = ctx.fmt.escapeHtml;
+    count.textContent = timeline.length + (timeline.length === 1 ? ' event' : ' events');
+    list.innerHTML = timeline.map(function(ev){
+      return '<li class="timeline-item">' +
+        '<span class="timeline-time mono">' + esc(ctx.fmt.time(ev.t)) + '</span>' +
+        '<span class="timeline-event">' + esc(ev.event) + '</span>' +
+      '</li>';
+    }).join('');
+  }
+
+  /* -------------------------------------------------------------- ledger */
+  function renderLedger(ctx, ledger){
+    var body = $('forensics-ledger-body');
+    var count = $('forensics-ledger-count');
+    var esc = ctx.fmt.escapeHtml;
+    count.textContent = ledger.length + (ledger.length === 1 ? ' item' : ' items');
+    body.innerHTML = ledger.map(function(row){
+      return '<tr>' +
+        '<td class="num mono">' + esc(row.seq) + '</td>' +
+        '<td>' + esc(row.item) + '</td>' +
+        '<td class="hash" title="' + esc(row.sha256) + '">' + esc(trunc(row.sha256)) + '</td>' +
+        '<td class="hash' + (row.seq === 1 ? ' is-genesis' : '') + '" title="' + esc(row.prevHash) + '">' + esc(trunc(row.prevHash)) + (row.seq === 1 ? ' <span class="pill pill--brass">genesis</span>' : '') + '</td>' +
+        '<td class="chain-arrow" aria-hidden="true">→</td>' +
+        '<td class="hash" title="' + esc(row.hash) + '">' + esc(trunc(row.hash)) + '</td>' +
+        '<td class="mono nowrap">' + esc(ctx.fmt.time(row.at)) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function verifyChain(ledger){
+    var ok = true, brokenAt = null;
+    for (var i = 0; i < ledger.length; i++){
+      var expectedPrev = i === 0 ? GENESIS : ledger[i - 1].hash;
+      if (ledger[i].prevHash !== expectedPrev){ ok = false; brokenAt = ledger[i].seq; break; }
+    }
+    return { ok: ok, count: ledger.length, brokenAt: brokenAt };
+  }
+
+  /* ------------------------------------------------------- anchor panel */
+  /* Full anchor record is rendered at rest (derived from the ledger head);
+     the button re-anchors the current head and updates the state line. */
+  function renderAnchor(ctx, ledger, justAnchored){
+    var esc = ctx.fmt.escapeHtml;
+    var last = ledger[ledger.length - 1];
+    var head = last.hash;
+    var n = parseInt(head.slice(0, 7), 16) || 0;
+    var blockHeight = 54000000 + (n % 900000);
+    var txid = '0x' + head;
+    $('forensics-anchor-kv').innerHTML =
+      '<dt>Network</dt><dd>Polygon Amoy testnet</dd>' +
+      '<dt>Chain head</dt><dd title="' + esc(head) + '">' + esc(trunc(head)) + '</dd>' +
+      '<dt>Anchor tx</dt><dd title="' + esc(txid) + '">' + esc(trunc(txid)) + '</dd>' +
+      '<dt>Block height</dt><dd>' + esc(ctx.fmt.number(blockHeight)) + '</dd>' +
+      '<dt>Anchored at</dt><dd>' + esc(ctx.fmt.date(last.at)) + '</dd>' +
+      '<dt>Items covered</dt><dd>' + esc(ledger.length) + '</dd>';
+    var stateEl = $('forensics-anchor-state');
+    if (justAnchored){
+      var caseLabel = currentCase ? currentCase.caseId : currentEmail.id;
+      stateEl.textContent = 'Re-anchored just now · ' + trunc(txid);
+      stateEl.className = 'mono is-anchored';
+      ctx.toast('Custody chain for ' + caseLabel + ' notarised at tx ' + trunc(txid) + ' (block ' + ctx.fmt.number(blockHeight) + ').', 'Anchor to blockchain');
+    } else {
+      stateEl.textContent = 'Head anchored · ' + ctx.fmt.date(last.at);
+      stateEl.className = 'muted mono';
+    }
+  }
+
+  /* ------------------------------------------------- case IOC set + campaigns */
+  function renderIocs(ctx, email){
+    var host = $('forensics-ioc-body');
+    var esc = ctx.fmt.escapeHtml;
+    var iocs = email.iocs;
+    if (!iocs.length){
+      host.innerHTML = '<p class="empty empty--strip muted">No indicators attached to this case — the sender is the domain of record and nothing was extracted for blocking.</p>';
+      return;
+    }
+    host.innerHTML =
+      '<div class="table-scroll"><table class="table"><thead><tr>' +
+        '<th scope="col">Type</th><th scope="col">Value</th>' +
+        '<th scope="col">Confidence</th><th scope="col">Source</th>' +
+        '<th scope="col" aria-hidden="true"></th>' +
+      '</tr></thead><tbody>' +
+      iocs.map(function(ioc, i){
+        var pctLabel = ctx.fmt.pct(ioc.confidence);
+        var pct = parseInt(pctLabel, 10);
+        return '<tr>' +
+          '<td><span class="pill">' + esc(ioc.type) + '</span></td>' +
+          '<td class="mono ioc-val" title="' + esc(ioc.value) + '">' + esc(ioc.value) + '</td>' +
+          '<td><div class="ioc-conf"><div class="meter ioc-meter"><span class="meter__fill meter__fill--brass" style="width:' + pct + '%"></span></div>' +
+            '<span class="mono ioc-pct">' + esc(pctLabel) + '</span></div></td>' +
+          '<td class="ioc-src">' + esc(ioc.source) + '</td>' +
+          '<td><button type="button" class="btn btn--ghost btn--sm" data-ioc-copy="' + i + '">Copy</button></td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
+  function renderCampaigns(ctx, email){
+    var host = $('forensics-campaign-body');
+    var count = $('forensics-campaign-count');
+    var esc = ctx.fmt.escapeHtml;
+    var camps = email.relatedCampaigns;
+    count.textContent = camps.length + ' linked';
+    if (!camps.length){
+      host.innerHTML = '<p class="empty empty--strip muted">No campaign linkage — no prior corpus match for this sender infrastructure.</p>';
+      return;
+    }
+    host.innerHTML = camps.map(function(c, i){
+      var pctLabel = ctx.fmt.pct(c.similarity);
+      var pct = parseInt(pctLabel, 10);
+      return '<div class="cmp-row">' +
+        '<div class="grow">' +
+          '<div class="row row--tight cmp-title">' +
+            '<span class="pill pill--accent">' + esc(c.id) + '</span>' +
+            '<span class="cmp-name">' + esc(c.name) + '</span>' +
+          '</div>' +
+          '<div class="row row--tight cmp-meta">' +
+            '<div class="meter cmp-meter"><span class="meter__fill" style="width:' + pct + '%"></span></div>' +
+            '<span class="mono">' + esc(pctLabel) + ' similar</span>' +
+            '<span class="mono muted">first seen ' + esc(ctx.fmt.date(c.firstSeen)) + ' · ' + esc(ctx.fmt.number(c.count)) + ' messages</span>' +
+          '</div>' +
+        '</div>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-cmp-pivot="' + i + '">Pivot to campaign</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* ------------------------------------------------------- recent cases */
+  function renderRecentCases(ctx){
+    var body = $('forensics-cases-body');
+    var esc = ctx.fmt.escapeHtml;
+    var cases = ctx.data.dashboard.recentCases;
+    body.innerHTML = cases.map(function(row){
+      var selected = currentCase ? row.caseId === currentCase.caseId : row.emailId === currentEmail.id;
+      return '<tr class="is-clickable" data-email="' + esc(row.emailId) + '"' + (selected ? ' aria-selected="true"' : '') + '>' +
+        '<td class="mono">' + esc(row.caseId) + '</td>' +
+        '<td class="mono">' + esc(row.emailId) + '</td>' +
+        '<td><span class="badge ' + statusBadgeClass(row.status) + '"><span class="badge__dot"></span>' + esc(row.status) + '</span></td>' +
+        '<td>' + esc(row.assignee) + '</td>' +
+        '<td class="mono nowrap">' + esc(ctx.fmt.date(row.openedAt)) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  /* ------------------------------------------------------------- mount */
+  function mount(rootEl, ctx){
+    root = rootEl;
+
+    $('forensics-ioc-body').addEventListener('click', function(e){
+      var btn = e.target.closest('[data-ioc-copy]');
+      if (!btn) return;
+      var ioc = currentEmail.iocs[parseInt(btn.getAttribute('data-ioc-copy'), 10)];
+      ctx.toast(ioc.type + ' — ' + ioc.value, 'IOC copied to clipboard');
+    });
+
+    $('forensics-campaign-body').addEventListener('click', function(e){
+      var btn = e.target.closest('[data-cmp-pivot]');
+      if (!btn) return;
+      var c = currentEmail.relatedCampaigns[parseInt(btn.getAttribute('data-cmp-pivot'), 10)];
+      ctx.toast('Pivoting to ' + c.id + ' — ' + c.name + ', ' + ctx.fmt.number(c.count) + ' linked messages.', 'Campaign view');
+    });
+
+    $('forensics-cases-body').addEventListener('click', function(e){
+      var tr = e.target.closest('tr[data-email]');
+      if (!tr) return;
+      ctx.select(tr.getAttribute('data-email'));
+    });
+
+    $('forensics-btn-verify').addEventListener('click', function(){
+      if (!currentEmail) return;
+      var result = verifyChain(currentEmail.evidenceLedger);
+      var el = $('forensics-verify-result');
+      var caseLabel = currentCase ? currentCase.caseId : currentEmail.id;
+      if (result.ok){
+        el.className = 'verify-result is-ok';
+        el.textContent = result.count + ' items · chain intact · genesis verified';
+        ctx.toast(result.count + ' items verified for ' + caseLabel + ' — chain intact, genesis confirmed.', 'Verify chain');
+      } else {
+        el.className = 'verify-result is-bad';
+        el.textContent = 'Break detected at seq ' + result.brokenAt + ' of ' + result.count + ' items.';
+        ctx.toast('Chain verification failed for ' + caseLabel + '.', 'Verify chain');
+      }
+    });
+
+    $('forensics-btn-anchor').addEventListener('click', function(){
+      if (!currentEmail) return;
+      renderAnchor(ctx, currentEmail.evidenceLedger, true);
+    });
+
+    function exportToast(btnId, title, verb){
+      $(btnId).addEventListener('click', function(){
+        var caseLabel = currentCase ? currentCase.caseId : (currentEmail ? currentEmail.id : '');
+        ctx.toast(verb + ' for ' + caseLabel + '.', title);
+      });
+    }
+    $('forensics-btn-ioc-csv').addEventListener('click', function(){
+      var n = (currentEmail && currentEmail.iocs ? currentEmail.iocs.length : 0);
+      var caseLabel = currentCase ? currentCase.caseId : (currentEmail ? currentEmail.id : '');
+      ctx.toast(n
+        ? n + ' indicators exported as CSV for ' + caseLabel + '.'
+        : 'No indicators to export for ' + caseLabel + '.', 'Export IOC set (CSV)');
+    });
+
+    exportToast('forensics-btn-pdf', 'Generate PDF report', 'Forensic report PDF generated');
+    exportToast('forensics-btn-json', 'Export JSON bundle', 'Case JSON bundle exported');
+    exportToast('forensics-btn-stix', 'Export STIX 2.1 + CSV IOCs', 'STIX 2.1 bundle and CSV IOC feed exported');
+    exportToast('forensics-btn-push', 'Push IOCs to gateway blocklist', 'IOC set pushed to the campus gateway blocklist');
+    exportToast('forensics-btn-cert', 'Escalate to CERT-In', 'Incident package queued for CERT-In escalation');
+  }
+
+  function onSelect(email, ctx){
+    currentEmail = email;
+    currentCase = ctx.caseFor(email.id);
+    var scopeLabel = currentCase ? currentCase.caseId : (email.id + ' (no case raised yet)');
+
+    renderCaseHeader(ctx, email, currentCase);
+    renderTimeline(ctx, email.timeline);
+    renderLedger(ctx, email.evidenceLedger);
+    var verifyEl = $('forensics-verify-result');
+    verifyEl.className = 'verify-result';
+    verifyEl.textContent = 'Chain not yet verified for this case.';
+    renderAnchor(ctx, email.evidenceLedger, false);
+    renderIocs(ctx, email);
+    renderCampaigns(ctx, email);
+    renderRecentCases(ctx);
+
+    var note = $('forensics-custody-note');
+    note.textContent = 'Chain of custody: every artefact above is hashed on ingest and appended to an append-only ledger scoped to ' + scopeLabel + '; exports embed the ledger and the anchor record so the chain can be independently re-verified by an investigator or a court.';
+  }
+
+  window.__screens.push(['forensics', { mount: mount, onSelect: onSelect }]);
+})();</script>

@@ -1,0 +1,451 @@
+<section class="screen" id="screen-overview" hidden aria-labelledby="overview-title">
+  <div class="screen__head">
+    <div>
+      <span class="eyebrow">Live · last 14 days</span>
+      <h2 class="screen__title" id="overview-title">Threat overview</h2>
+    </div>
+    <div class="row row--tight">
+      <button type="button" class="btn btn--ghost btn--sm" id="overview-btn-refresh">Refresh feed</button>
+      <button type="button" class="btn btn--ghost btn--sm" id="overview-btn-export">Export triage (CSV)</button>
+      <button type="button" class="btn btn--primary btn--sm" id="overview-btn-new">New analysis</button>
+    </div>
+  </div>
+
+  <div class="stack">
+
+    <!-- 1. KPI strip -->
+    <div class="grid-3" id="overview-kpis" role="group" aria-label="Today's key metrics"></div>
+
+    <!-- 2. 14-day stacked threat chart -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <span class="eyebrow">Detection engines · 14-day window</span>
+          <h3>Malicious &amp; suspicious volume, with safe traffic for context</h3>
+        </div>
+      </div>
+      <div class="chart-wrap" id="overview-chart"></div>
+      <div class="chart-legend">
+        <span><i style="background:var(--sev-critical)"></i>Malicious</span>
+        <span><i style="background:var(--sev-high)"></i>Suspicious</span>
+        <span><i style="background:var(--sev-safe)"></i>Safe volume (own scale, top strip)</span>
+        <span><i style="background:var(--sev-critical-wash);border:1px solid var(--sev-critical)"></i>Spike day</span>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- 3. Category breakdown -->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Today · by category</span>
+            <h3>Category breakdown</h3>
+          </div>
+        </div>
+        <div id="overview-categories"></div>
+      </div>
+
+      <!-- 4. Top origin countries -->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Geo · first external hop, 14 days</span>
+            <h3>Top origin countries</h3>
+          </div>
+        </div>
+        <div id="overview-origins"></div>
+      </div>
+    </div>
+
+    <!-- 5. Triage table -->
+    <div class="card card--flush">
+      <div class="card-head">
+        <div>
+          <span class="eyebrow">All analysed samples</span>
+          <h3>Triage queue</h3>
+        </div>
+        <p class="muted" id="overview-selected-caption" aria-live="polite"></p>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Received</th>
+              <th scope="col">Sender</th>
+              <th scope="col">Subject</th>
+              <th scope="col">Category</th>
+              <th scope="col" class="num">Score</th>
+              <th scope="col">Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="overview-triage-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. Engine health + recent cases -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Pipeline status</span>
+            <h3>Engine health</h3>
+          </div>
+        </div>
+        <div id="overview-engines"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Forensics</span>
+            <h3>Recent cases</h3>
+          </div>
+        </div>
+        <div class="case-list" id="overview-cases"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<style>
+/* KPI strip: 6 up on a wide console, collapsing on narrower ones.
+   (Must be CSS, not an inline style — an inline grid-template-columns
+   would override .grid-3's media queries and never collapse.) */
+#screen-overview #overview-kpis{ grid-template-columns: repeat(6, minmax(0,1fr)); }
+@media (max-width: 1280px){ #screen-overview #overview-kpis{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 720px){ #screen-overview #overview-kpis{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+#screen-overview #overview-selected-caption{ margin: 0; font-size: var(--fs-xs); }
+
+#screen-overview .chart-wrap{ width: 100%; }
+#screen-overview .chart-wrap svg{ display: block; width: 100%; height: auto; }
+#screen-overview .chart-legend{ display: flex; gap: var(--s-4); margin-top: var(--s-3); flex-wrap: wrap; }
+#screen-overview .chart-legend span{
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted);
+}
+#screen-overview .chart-legend i{ width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+#screen-overview .ch-grid{ stroke: var(--grid-line); stroke-width: 1; }
+#screen-overview .ch-axis{ stroke: var(--border-strong); stroke-width: 1; }
+#screen-overview .ch-lbl{ font-family: var(--font-mono); font-size: 10px; fill: var(--text-faint); }
+#screen-overview .ch-cap{ font-family: var(--font-mono); font-size: 10px; fill: var(--text-muted); letter-spacing: .08em; }
+#screen-overview .ch-mal{ fill: var(--sev-critical); }
+#screen-overview .ch-sus{ fill: var(--sev-high); }
+#screen-overview .ch-spike{ fill: var(--sev-critical-wash); }
+#screen-overview .ch-safe{ fill: none; stroke: var(--sev-safe); stroke-width: 1.6; }
+
+#screen-overview .kpi--critical .kpi__value{ color: var(--sev-critical); }
+#screen-overview .kpi--high .kpi__value{ color: var(--sev-high); }
+#screen-overview .kpi--safe .kpi__value{ color: var(--sev-safe); }
+#screen-overview .kpi--accent .kpi__value{ color: var(--accent); }
+#screen-overview .kpi--brass .kpi__value{ color: var(--brass); }
+
+#screen-overview .legit-row{
+  padding: var(--s-3); margin-bottom: var(--s-3);
+  background: var(--sev-safe-wash); border: 1px solid var(--border); border-radius: var(--r-2);
+}
+#screen-overview .legit-row .legit-count{ font-family: var(--font-mono); font-size: var(--fs-lg); color: var(--sev-safe); white-space: nowrap; }
+
+#screen-overview .bar-label{ flex: 0 0 auto; font-size: var(--fs-sm); }
+#screen-overview .bar-count{ flex: 0 0 auto; text-align: right; font-family: var(--font-mono); font-size: var(--fs-sm); }
+#screen-overview #overview-categories .bar-row{ padding: 5px 0; }
+#screen-overview #overview-categories .bar-label{ width: 168px; color: var(--text-2); }
+#screen-overview #overview-categories .bar-count{ width: 108px; }
+#screen-overview #overview-origins .bar-row{ padding: 6px 0; }
+#screen-overview #overview-origins .bar-label{ width: 150px; display: flex; align-items: center; gap: 8px; }
+#screen-overview #overview-origins .bar-count{ width: 46px; }
+
+#screen-overview .meta-stack{ display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#screen-overview .sender-name{ color: var(--text); font-size: var(--fs-sm); }
+#screen-overview .sender-addr{ color: var(--text-faint); font-size: var(--fs-xs); }
+#screen-overview .table td.ring-cell .score-ring{ display: inline-grid; vertical-align: middle; }
+
+#screen-overview .engine-row{ padding: 7px 0; border-bottom: 1px solid var(--border-soft); }
+#screen-overview .engine-row:last-child{ border-bottom: none; }
+#screen-overview .engine-name{ flex: 1 1 auto; font-size: var(--fs-sm); color: var(--text-2); }
+#screen-overview .engine-lat{ font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-faint); width: 72px; text-align: right; }
+
+#screen-overview .case-list{ display: flex; flex-direction: column; gap: var(--s-2); }
+#screen-overview .case-row{
+  padding: 9px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-2);
+}
+#screen-overview .meta-stack .id{ font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); }
+#screen-overview .meta-stack .sub{ font-size: var(--fs-xs); color: var(--text-faint); }
+#screen-overview .case-actions{ flex: 0 0 auto; }
+</style>
+
+<script>(function () {
+  window.__screens = window.__screens || [];
+  var root = null;
+  var esc;
+
+  /* ---------- small pure helpers (no App/EFP_DATA access at parse time) ---------- */
+
+  function niceMax(v) { return Math.ceil((v || 10) / 40) * 40; }
+
+  var STATUS_BADGE = { operational: 'badge--safe', degraded: 'badge--medium' };
+  function statusBadgeClass(status) {
+    return STATUS_BADGE[status] || 'badge--high'; /* queue backlog etc. */
+  }
+
+  var CASE_BADGE = {
+    closed: 'badge--safe',
+    containment: 'badge--critical',
+    open: 'badge--high',
+    'reported to cert-in': 'badge--medium'
+  };
+  function caseBadgeClass(status) {
+    return CASE_BADGE[status.toLowerCase()] || 'badge--info'; /* awaiting vendor etc. */
+  }
+
+  var CATEGORY_SEV = {
+    'Credential phishing': 'critical',
+    'Lookalike domain': 'critical',
+    'BEC/CEO fraud': 'critical',
+    'Invoice fraud': 'high',
+    'Malware delivery': 'critical'
+  };
+
+  /* ---------- KPI strip ---------- */
+
+  function renderKpis(k, ctx) {
+    var cards = [
+      { label: 'Analysed today', value: ctx.fmt.number(k.analysedToday), sub: 'all ingest sources', tone: 'accent' },
+      { label: 'Malicious', value: ctx.fmt.number(k.malicious), sub: ctx.fmt.pct(k.malicious / k.analysedToday) + ' of today', tone: 'critical' },
+      { label: 'Suspicious', value: ctx.fmt.number(k.suspicious), sub: ctx.fmt.pct(k.suspicious / k.analysedToday) + ' of today', tone: 'high' },
+      { label: 'Safe', value: ctx.fmt.number(k.safe), sub: ctx.fmt.pct(k.safe / k.analysedToday) + ' of today', tone: 'safe' },
+      { label: 'Avg analysis time', value: ctx.fmt.ms(k.avgAnalysisMs), sub: 'per message, all engines', tone: 'accent' },
+      { label: 'Cases open', value: ctx.fmt.number(k.casesOpen), sub: 'forensic investigations', tone: 'brass' }
+    ];
+    return cards.map(function (c) {
+      return '<div class="kpi kpi--' + c.tone + '">' +
+        '<span class="kpi__label">' + c.label + '</span>' +
+        '<span class="kpi__value">' + c.value + '</span>' +
+        '<span class="kpi__sub">' + c.sub + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---------- 14-day stacked chart (hand-computed SVG) ---------- */
+
+  function renderChart(days, ctx) {
+    var W = 940;
+    var marginLeft = 52, marginRight = 14;
+    var plotW = W - marginLeft - marginRight;
+    var bandW = plotW / days.length;
+    var barW = Math.min(30, bandW * 0.52);
+
+    /* two stacked plots: a quiet safe-volume strip on its own scale, then the
+       malicious + suspicious stack. All y values computed from the data. */
+    var safeTop = 20, safeH = 54, safeBottom = safeTop + safeH;
+    var mainTop = 104, mainH = 180, mainBottom = mainTop + mainH;
+    var xLabelY = mainBottom + 17;
+    var H = xLabelY + 10;
+
+    var stackMax = Math.max.apply(null, days.map(function (d) { return d.malicious + d.suspicious; }));
+    var safeMax = Math.max.apply(null, days.map(function (d) { return d.safe; }));
+    stackMax = niceMax(stackMax);
+    safeMax = niceMax(safeMax);
+    var spikeThreshold = stackMax * 0.4;
+
+    function yMain(v) { return mainBottom - (v / stackMax) * mainH; }
+    function ySafe(v) { return safeBottom - (v / safeMax) * safeH; }
+
+    var svg = '';
+
+    /* gridlines + y axis labels for the main plot */
+    var gridTicks = 4, i, gy, val;
+    for (i = 0; i <= gridTicks; i++) {
+      val = Math.round((stackMax / gridTicks) * i);
+      gy = yMain(val);
+      svg += '<line class="ch-grid" x1="' + marginLeft + '" x2="' + (W - marginRight) + '" y1="' + gy + '" y2="' + gy + '"/>';
+      svg += '<text class="ch-lbl" x="' + (marginLeft - 8) + '" y="' + (gy + 3) + '" text-anchor="end">' + val + '</text>';
+    }
+    svg += '<line class="ch-axis" x1="' + marginLeft + '" x2="' + marginLeft + '" y1="' + safeTop + '" y2="' + mainBottom + '"/>';
+
+    /* captions: each plot states its own scale so the two are never confused */
+    svg += '<text class="ch-cap" x="' + marginLeft + '" y="' + (safeTop - 6) + '">SAFE VOLUME / DAY (0-' + ctx.fmt.number(safeMax) + ', OWN SCALE)</text>';
+    svg += '<line class="ch-grid" x1="' + marginLeft + '" x2="' + (W - marginRight) + '" y1="' + safeBottom + '" y2="' + safeBottom + '"/>';
+    svg += '<text class="ch-cap" x="' + marginLeft + '" y="' + (mainTop - 8) + '">MALICIOUS + SUSPICIOUS / DAY (0-' + ctx.fmt.number(stackMax) + ')</text>';
+
+    var safePts = [];
+    days.forEach(function (d, idx) {
+      var cx = marginLeft + idx * bandW + bandW / 2;
+      var bx = cx - barW / 2;
+      var stackV = d.malicious + d.suspicious;
+
+      if (stackV >= spikeThreshold) {
+        svg += '<rect class="ch-spike" x="' + (marginLeft + idx * bandW) + '" y="' + mainTop + '" width="' + bandW + '" height="' + mainH + '"/>';
+      }
+
+      var yMal = yMain(d.malicious);
+      var hMal = mainBottom - yMal;
+      var yStackTop = yMain(stackV);
+      var hSus = yMal - yStackTop;
+
+      svg += '<rect class="ch-mal" x="' + bx + '" y="' + yMal + '" width="' + barW + '" height="' + hMal + '"><title>' + esc(d.day + ' — ' + d.malicious + ' malicious') + '</title></rect>';
+      if (d.suspicious > 0) {
+        svg += '<rect class="ch-sus" x="' + bx + '" y="' + yStackTop + '" width="' + barW + '" height="' + hSus + '"><title>' + esc(d.day + ' — ' + d.suspicious + ' suspicious') + '</title></rect>';
+      }
+      svg += '<text class="ch-lbl" x="' + cx + '" y="' + xLabelY + '" text-anchor="middle">' + esc(d.day) + '</text>';
+
+      safePts.push(cx + ',' + ySafe(d.safe));
+    });
+
+    svg += '<polyline class="ch-safe" points="' + safePts.join(' ') + '"/>';
+
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="14-day chart: malicious and suspicious mail per day as stacked bars (0 to ' + stackMax + '), with safe volume as a line on its own scale (0 to ' + safeMax + ') above">' + svg + '</svg>';
+  }
+
+  /* ---------- category breakdown ---------- */
+
+  function renderCategories(cats, ctx) {
+    var total = 0;
+    cats.forEach(function (c) { total += c.count; });
+    var legit = null, threats = [];
+    cats.forEach(function (c) { if (c.category === 'Legitimate') { legit = c; } else { threats.push(c); } });
+    threats.sort(function (a, b) { return b.count - a.count; });
+    var maxThreat = threats.length ? threats[0].count : 1;
+
+    var legitPct = ctx.fmt.pct(legit.count / total);
+    var html = '<div class="legit-row row row--between">' +
+      '<div><strong>' + esc(legit.category) + '</strong>' +
+      '<div class="muted" style="font-size:var(--fs-xs)">Shown apart — dwarfs every threat category on a shared scale</div></div>' +
+      '<div class="legit-count">' + ctx.fmt.number(legit.count) + ' <span class="muted" style="font-size:var(--fs-xs)">(' + legitPct + ')</span></div>' +
+      '</div>';
+    html += threats.map(function (c) {
+      var pct = Math.round((c.count / maxThreat) * 100);
+      var ofTotal = ctx.fmt.pct(c.count / total);
+      var sev = CATEGORY_SEV[c.category];
+      return '<div class="bar-row row">' +
+        '<span class="bar-label">' + esc(c.category) + '</span>' +
+        '<span class="meter grow"><span class="meter__fill meter__fill--' + sev + '" style="width:' + pct + '%"></span></span>' +
+        '<span class="bar-count">' + ctx.fmt.number(c.count) + ' <span class="muted">(' + ofTotal + ')</span></span>' +
+        '</div>';
+    }).join('');
+    return html;
+  }
+
+  /* ---------- top origin countries ---------- */
+
+  function renderOrigins(list, ctx) {
+    var max = list.length ? list[0].count : 1;
+    return list.map(function (c) {
+      var pct = Math.round((c.count / max) * 100);
+      return '<div class="bar-row row">' +
+        '<span class="bar-label"><span class="pill pill--accent">' + esc(c.countryCode) + '</span>' + esc(c.country) + '</span>' +
+        '<span class="meter grow"><span class="meter__fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="bar-count">' + ctx.fmt.number(c.count) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---------- triage table ---------- */
+
+  function renderTriageRows(emails, ctx) {
+    return emails.map(function (e) {
+      var sev = ctx.fmt.severity(e.riskScore);
+      return '<tr class="is-clickable" data-email-id="' + esc(e.id) + '" tabindex="0" aria-selected="false">' +
+        '<td class="mono nowrap">' + esc(ctx.fmt.date(e.receivedAt)) + '</td>' +
+        '<td><div class="meta-stack"><span class="sender-name">' + esc(e.from.display) + '</span>' +
+        '<span class="sender-addr mono">' + esc(e.from.address) + '</span></div></td>' +
+        '<td>' + esc(e.subject) + '</td>' +
+        '<td><span class="pill">' + esc(e.category) + '</span></td>' +
+        '<td class="num ring-cell"><span class="score-ring score-ring--sm score-ring--' + sev + '" style="--ring-val:' + e.riskScore + '">' +
+        '<span class="score-ring__val">' + e.riskScore + '</span></span></td>' +
+        '<td><span class="badge ' + ctx.fmt.badgeClass(e.verdict) + '"><span class="badge__dot"></span>' + esc(e.verdict) + '</span></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  /* ---------- engine health ---------- */
+
+  function renderEngines(list, ctx) {
+    return list.map(function (e) {
+      return '<div class="engine-row row">' +
+        '<span class="badge ' + statusBadgeClass(e.status) + '"><span class="badge__dot"></span>' + esc(e.status) + '</span>' +
+        '<span class="engine-name">' + esc(e.engine) + '</span>' +
+        '<span class="engine-lat">' + ctx.fmt.ms(e.latencyMs) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---------- recent cases ---------- */
+
+  function renderCases(cases, ctx) {
+    return cases.map(function (c) {
+      return '<div class="case-row row row--between">' +
+        '<div class="meta-stack">' +
+        '<span class="id">' + esc(c.caseId) + ' <span class="muted mono" style="font-size:var(--fs-xs)">· ' + esc(c.emailId) + '</span></span>' +
+        '<span class="sub">' + esc(c.assignee) + ' · opened ' + esc(ctx.fmt.date(c.openedAt)) + '</span>' +
+        '</div>' +
+        '<div class="case-actions row">' +
+        '<span class="badge ' + caseBadgeClass(c.status) + '"><span class="badge__dot"></span>' + esc(c.status) + '</span>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-case-email="' + esc(c.emailId) + '"' +
+        ' aria-label="Open ' + esc(c.caseId) + ' in the forensics workspace">Case file</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- mount / onSelect ---------- */
+
+  function mount(rootEl, ctx) {
+    root = rootEl;
+    esc = ctx.fmt.escapeHtml;
+    var d = ctx.data.dashboard;
+    var emails = ctx.data.emails;
+
+    root.querySelector('#overview-kpis').innerHTML = renderKpis(d.kpis, ctx);
+    root.querySelector('#overview-chart').innerHTML = renderChart(d.threatsByDay, ctx);
+    root.querySelector('#overview-categories').innerHTML = renderCategories(d.categoryBreakdown, ctx);
+    root.querySelector('#overview-origins').innerHTML = renderOrigins(d.topOriginCountries, ctx);
+    root.querySelector('#overview-triage-body').innerHTML = renderTriageRows(emails, ctx);
+    root.querySelector('#overview-engines').innerHTML = renderEngines(d.engineHealth, ctx);
+    root.querySelector('#overview-cases').innerHTML = renderCases(d.recentCases, ctx);
+
+    function openRow(id) {
+      ctx.select(id);
+      ctx.go('analyze');
+    }
+
+    var tbody = root.querySelector('#overview-triage-body');
+    function onActivate(ev) {
+      if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
+      var tr = ev.target.closest('tr[data-email-id]');
+      if (!tr) return;
+      if (ev.type === 'keydown') ev.preventDefault();
+      openRow(tr.getAttribute('data-email-id'));
+    }
+    tbody.addEventListener('click', onActivate);
+    tbody.addEventListener('keydown', onActivate);
+
+    root.querySelector('#overview-cases').addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-case-email]');
+      if (btn) { ctx.select(btn.getAttribute('data-case-email')); ctx.go('forensics'); }
+    });
+
+    root.querySelector('#overview-btn-refresh').addEventListener('click', function () {
+      ctx.toast('Queue re-read at the top of the feed — ' + emails.length + ' retained samples out of ' +
+        ctx.fmt.number(d.kpis.analysedToday) + ' messages analysed today.', 'Feed refreshed');
+    });
+    root.querySelector('#overview-btn-export').addEventListener('click', function () {
+      ctx.toast('Exporting ' + emails.length + ' rows (subject, sender, verdict, score) as triage.csv.', 'Export triage');
+    });
+    root.querySelector('#overview-btn-new').addEventListener('click', function () {
+      ctx.go('analyze');
+    });
+  }
+
+  function onSelect(email, ctx) {
+    var rows = root.querySelectorAll('#overview-triage-body tr[data-email-id]');
+    rows.forEach(function (row) {
+      row.setAttribute('aria-selected', row.getAttribute('data-email-id') === email.id ? 'true' : 'false');
+    });
+    root.querySelector('#overview-selected-caption').textContent = 'Selected: ' + email.id + ' — ' + email.subject;
+  }
+
+  window.__screens.push(['overview', { mount: mount, onSelect: onSelect }]);
+})();</script>

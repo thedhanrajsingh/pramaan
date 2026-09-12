@@ -1,0 +1,369 @@
+<title>Pramaan</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>/*TOKENS*/</style>
+<style>
+/* ---------------- shell-only layout ---------------- */
+#app{
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* left instrument rail */
+#rail{
+  position: sticky; top: 0; align-self: start;
+  height: 100vh;
+  display: flex; flex-direction: column;
+  background: #0C1B1F;
+  border-right: 1px solid var(--border);
+}
+#rail .wordmark{ padding: var(--s-5) var(--s-5) var(--s-4); border-bottom: 1px solid var(--border); }
+#rail .wordmark b{
+  display: block; font-family: var(--font-display); font-weight: 700;
+  font-size: 24px; letter-spacing: .22em; color: var(--text);
+}
+#rail .wordmark span{
+  display: block; margin-top: 4px;
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .16em; color: var(--text-faint);
+}
+#rail .wordmark b::first-letter{ color: var(--accent); }
+
+#nav{ padding: var(--s-4) var(--s-3); display: flex; flex-direction: column; gap: 2px; }
+#nav .nav-btn{
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-left: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 10px var(--s-3); border-radius: var(--r-2);
+}
+#nav .nav-btn .idx{
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+  border: 1px solid var(--border); border-radius: var(--r-1); padding: 1px 4px;
+}
+#nav .nav-btn:hover{ background: var(--surface); color: var(--text-2); }
+#nav .nav-btn[aria-current="page"]{
+  background: var(--accent-wash); color: var(--accent);
+  border-color: var(--border); border-left-color: var(--accent);
+}
+#nav .nav-btn[aria-current="page"] .idx{ color: var(--accent); border-color: var(--accent-line); }
+
+#rail .rail-foot{
+  margin-top: auto; padding: var(--s-4) var(--s-4) var(--s-5);
+  border-top: 1px solid var(--border);
+}
+#engine-health{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+#engine-health li{
+  display: flex; align-items: center; gap: var(--s-2);
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
+}
+#engine-health .dot{ width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--sev-safe); flex: 0 0 auto; }
+#engine-health .dot.warn{ background: var(--sev-medium); }
+#engine-health .dot.bad{ background: var(--sev-high); }
+#engine-health .name{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#engine-health .ms{ margin-left: auto; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* top bar */
+#topbar{
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: var(--s-4);
+  height: var(--topbar-h); padding: 0 var(--s-7);
+  background: #0C1B1FF2;
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+#topbar .tb-label{
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .16em; color: var(--text-faint); white-space: nowrap;
+}
+#email-select{ min-width: 300px; max-width: 520px; width: auto; }
+#topbar .spacer{ flex: 1 1 auto; }
+#analyst{
+  display: flex; align-items: center; gap: var(--s-3); padding-left: var(--s-4);
+  border-left: 1px solid var(--border);
+}
+#analyst .who{ line-height: 1.25; text-align: right; }
+#analyst .who b{ display: block; font-size: var(--fs-sm); color: var(--text); font-weight: 600; }
+#analyst .who span{ font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .12em; }
+#analyst .avatar{
+  width: 32px; height: 32px; border-radius: var(--r-2);
+  display: grid; place-items: center;
+  background: var(--accent-wash); border: 1px solid var(--accent-line);
+  color: var(--accent); font-family: var(--font-display); font-weight: 700; font-size: 12px;
+}
+
+/* toasts */
+#toasts{
+  position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 60;
+  display: flex; flex-direction: column; gap: var(--s-2); max-width: 360px;
+}
+#toasts .toast{
+  background: var(--overlay); border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-2); box-shadow: var(--shadow-2);
+  padding: 10px var(--s-3); font-size: var(--fs-sm); color: var(--text-2);
+}
+#toasts .toast b{ color: var(--text); font-family: var(--font-display); }
+
+#screens:focus{ outline: none; }
+
+@media (max-width: 900px){
+  #app{ grid-template-columns: minmax(0,1fr); }
+  #rail{ position: static; height: auto; flex-direction: column; }
+  #rail .rail-foot{ display: none; }
+  #nav{ flex-direction: row; flex-wrap: wrap; }
+  #topbar{ padding: var(--s-3) var(--s-4); height: auto; flex-wrap: wrap; }
+  #email-select{ min-width: 0; width: 100%; }
+}
+</style>
+
+<div id="app">
+  <aside id="rail">
+    <div class="wordmark">
+      <b>PRAMAAN</b>
+      <span>Email threat &amp; forensic intelligence</span>
+    </div>
+    <nav id="nav" aria-label="Primary">
+      <button class="nav-btn" type="button" data-screen="overview"><span class="idx">1</span> Overview</button>
+      <button class="nav-btn" type="button" data-screen="analyze"><span class="idx">2</span> Analyze</button>
+      <button class="nav-btn" type="button" data-screen="trace"><span class="idx">3</span> Trace</button>
+      <button class="nav-btn" type="button" data-screen="forensics"><span class="idx">4</span> Forensics</button>
+    </nav>
+    <div class="rail-foot">
+      <span class="eyebrow">Engine health</span>
+      <ul id="engine-health"></ul>
+    </div>
+  </aside>
+
+  <div>
+    <header id="topbar">
+      <span class="tb-label">Under investigation</span>
+      <select id="email-select" aria-label="Select the email or case under investigation"></select>
+      <button class="btn btn--primary" type="button" id="btn-analyse">Analyse new email</button>
+      <span class="spacer"></span>
+      <div id="analyst">
+        <div class="who">
+          <b>A. Nair</b>
+          <span>Tier-2 SOC · AICTE CSC</span>
+        </div>
+        <div class="avatar" aria-hidden="true">AN</div>
+      </div>
+    </header>
+
+    <main id="screens" tabindex="-1">
+      <!--SECTIONS-->
+    </main>
+  </div>
+</div>
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script>//DATA</script>
+
+<script>
+/* ============================ PRAMAAN app core ============================
+   Section scripts run BEFORE this file (they sit inside <main>), so they must
+   only push [id, api] onto window.__screens. This core drains that queue. */
+(function () {
+  'use strict';
+
+  var SCREEN_IDS = ['overview', 'analyze', 'trace', 'forensics'];
+  var DATA = window.EFP_DATA || { emails: [], dashboard: {} };
+
+  function escapeHtml(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var fmt = {
+    escapeHtml: escapeHtml,
+    date: function (iso) {
+      var d = new Date(iso);
+      if (isNaN(d)) return String(iso || '');
+      // en-US parts, reordered to day-month-year so the month stays a 3-letter abbreviation ("Sep", not en-GB's "Sept").
+      var p = {}; new Intl.DateTimeFormat('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+      return p.day + ' ' + p.month + ' ' + p.year + ', ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    },
+    time: function (iso) {
+      var d = new Date(iso);
+      if (isNaN(d)) return String(iso || '');
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    },
+    number: function (n) {
+      if (n === null || n === undefined || isNaN(n)) return '—';
+      return Number(n).toLocaleString('en-IN');
+    },
+    ms: function (n) {
+      if (!n) return '0 ms';
+      return n >= 1000 ? (n / 1000).toFixed(2) + ' s' : Math.round(n) + ' ms';
+    },
+    pct: function (v) { return Math.round(Number(v) * 100) + '%'; },
+    severity: function (score) {
+      var s = Number(score) || 0;
+      if (s >= 85) return 'critical';
+      if (s >= 65) return 'high';
+      if (s >= 40) return 'medium';
+      if (s >= 20) return 'low';
+      return 'safe';
+    },
+    badgeClass: function (verdict) {
+      switch (String(verdict || '').toLowerCase()) {
+        case 'malicious': return 'badge--critical';
+        case 'suspicious': return 'badge--high';
+        case 'safe': return 'badge--safe';
+        default: return 'badge--info';
+      }
+    }
+  };
+
+  var App = {
+    screens: {},
+    data: DATA,
+    fmt: fmt,
+    state: { selectedEmailId: null, screen: null },
+
+    email: function () {
+      var id = App.state.selectedEmailId;
+      return DATA.emails.find(function (e) { return e.id === id; }) || DATA.emails[0] || null;
+    },
+
+    caseFor: function (emailId) {
+      var cases = (DATA.dashboard && DATA.dashboard.recentCases) || [];
+      return cases.find(function (c) { return c.emailId === emailId; }) || null;
+    },
+
+    select: function (emailId) {
+      var mail = DATA.emails.find(function (e) { return e.id === emailId; });
+      if (!mail) return;
+      App.state.selectedEmailId = mail.id;
+      var sel = document.getElementById('email-select');
+      if (sel && sel.value !== mail.id) sel.value = mail.id;
+      SCREEN_IDS.forEach(function (id) {
+        var api = App.screens[id];
+        if (api && typeof api.onSelect === 'function') {
+          try { api.onSelect(mail, App); } catch (err) { console.error('[' + id + '] onSelect', err); }
+        }
+      });
+    },
+
+    go: function (screenId) {
+      App.state.screen = screenId;
+      SCREEN_IDS.forEach(function (id) {
+        var el = document.getElementById('screen-' + id);
+        if (el) el.hidden = (id !== screenId);
+      });
+      var btns = document.querySelectorAll('#nav .nav-btn');
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].getAttribute('data-screen') === screenId) {
+          btns[i].setAttribute('aria-current', 'page');
+        } else {
+          btns[i].removeAttribute('aria-current');
+        }
+      }
+      if (location.hash !== '#/' + screenId) {
+        history.replaceState(null, '', '#/' + screenId);
+      }
+      window.scrollTo(0, 0);
+      var main = document.getElementById('screens');
+      if (main) main.focus();
+    },
+
+    toast: function (msg, title) {
+      var host = document.getElementById('toasts');
+      if (!host) return;
+      var el = document.createElement('div');
+      el.className = 'toast';
+      el.setAttribute('role', 'status');
+      el.innerHTML = (title ? '<b>' + escapeHtml(title) + '</b><br>' : '') + escapeHtml(msg);
+      host.appendChild(el);
+      window.setTimeout(function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 4200);
+    }
+  };
+
+  window.App = App;
+
+  /* ------------------------------ boot ------------------------------ */
+  function buildEmailSelect() {
+    var sel = document.getElementById('email-select');
+    if (!sel) return;
+    sel.innerHTML = DATA.emails.map(function (e) {
+      var c = App.caseFor(e.id);
+      var label = e.id + ' · ' + e.verdict + ' ' + e.riskScore + ' · ' +
+        (e.subject.length > 58 ? e.subject.slice(0, 57) + '…' : e.subject) +
+        (c ? ' · ' + c.caseId : '');
+      return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+    sel.addEventListener('change', function () { App.select(sel.value); });
+  }
+
+  function buildEngineHealth() {
+    var ul = document.getElementById('engine-health');
+    var list = (DATA.dashboard && DATA.dashboard.engineHealth) || [];
+    if (!ul) return;
+    ul.innerHTML = list.slice(0, 6).map(function (e) {
+      var cls = e.status === 'operational' ? '' : (e.status === 'degraded' ? 'warn' : 'bad');
+      return '<li title="' + escapeHtml(e.engine + ' — ' + e.status) + '">' +
+        '<span class="dot ' + cls + '"></span><span class="name">' + escapeHtml(e.engine) + '</span>' +
+        '<span class="ms">' + escapeHtml(e.latencyMs) + 'ms</span></li>';
+    }).join('');
+  }
+
+  function mountScreens() {
+    var queue = window.__screens || [];
+    for (var i = 0; i < queue.length; i++) {
+      var entry = queue[i];
+      App.screens[entry[0]] = entry[1];
+    }
+    SCREEN_IDS.forEach(function (id) {
+      var api = App.screens[id];
+      var el = document.getElementById('screen-' + id);
+      if (!api || !el) return;
+      try { api.mount(el, App); }
+      catch (err) { console.error('[' + id + '] mount', err); }
+    });
+  }
+
+  function wireChrome() {
+    var nav = document.getElementById('nav');
+    if (nav) {
+      nav.addEventListener('click', function (ev) {
+        var btn = ev.target.closest ? ev.target.closest('.nav-btn') : null;
+        if (btn) App.go(btn.getAttribute('data-screen'));
+      });
+    }
+    var analyse = document.getElementById('btn-analyse');
+    if (analyse) {
+      analyse.addEventListener('click', function () {
+        App.go('analyze');
+        App.toast('Ingest panel ready — drop an .eml file or paste the raw source.', 'Analyse new email');
+      });
+    }
+    window.addEventListener('hashchange', function () {
+      var id = (location.hash || '').replace('#/', '');
+      if (SCREEN_IDS.indexOf(id) >= 0 && id !== App.state.screen) App.go(id);
+    });
+  }
+
+  function init() {
+    buildEmailSelect();
+    buildEngineHealth();
+    mountScreens();
+    wireChrome();
+    if (DATA.emails.length) App.select(DATA.emails[0].id);
+    var hashed = (location.hash || '').replace('#/', '');
+    App.go(SCREEN_IDS.indexOf(hashed) >= 0 ? hashed : 'overview');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

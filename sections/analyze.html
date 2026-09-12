@@ -1,0 +1,539 @@
+<section class="screen" id="screen-analyze" hidden aria-labelledby="analyze-title">
+  <div class="screen__head">
+    <div>
+      <span class="eyebrow">Verdict sheet · explainable scoring</span>
+      <h2 class="screen__title" id="analyze-title">Email analysis</h2>
+    </div>
+    <div class="row row--tight">
+      <button class="btn btn--ghost btn--sm" type="button" data-jump="analyze-signals">Signals</button>
+      <button class="btn btn--ghost btn--sm" type="button" data-jump="analyze-links">Links</button>
+      <button class="btn btn--ghost btn--sm" type="button" data-jump="analyze-attachments">Attachments</button>
+      <button class="btn btn--ghost btn--sm" type="button" data-jump="analyze-raw">Raw headers</button>
+    </div>
+  </div>
+
+  <div class="analyze-layout">
+    <div class="stack" id="analyze-ingest-col">
+      <div class="card" id="analyze-ingest-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Ingest pipeline</span>
+            <h3>Ingest &amp; run</h3>
+          </div>
+        </div>
+        <div class="stack stack--tight">
+          <div>
+            <label for="analyze-source-select">Ingest source</label>
+            <select id="analyze-source-select">
+              <option value="paste">Paste raw source</option>
+              <option value="upload">Upload .eml / .msg</option>
+              <option value="imap">IMAP / abuse@ connector</option>
+              <option value="api">API webhook</option>
+            </select>
+          </div>
+          <div class="dropzone" id="analyze-dropzone">
+            <div>Drop .eml / .msg here</div>
+            <div class="row" style="justify-content:center;margin-top:var(--s-3)">
+              <button class="btn btn--ghost btn--sm" type="button" id="analyze-upload-btn">Upload .eml</button>
+            </div>
+          </div>
+          <div>
+            <label for="analyze-raw-textarea">Raw source (headers + body)</label>
+            <textarea id="analyze-raw-textarea" rows="12" spellcheck="false"></textarea>
+          </div>
+          <button class="btn btn--primary" type="button" id="analyze-run-btn">Run analysis</button>
+          <div class="analyze-progress" id="analyze-progress" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack" id="analyze-verdict-col">
+      <div class="card" id="analyze-verdict-card"></div>
+      <div class="card" id="analyze-identity-card"></div>
+      <div class="card" id="analyze-auth-card"></div>
+      <div class="card" id="analyze-signals">
+        <div class="card-head">
+          <div><span class="eyebrow">Explainability core</span><h3>Signal table</h3></div>
+        </div>
+        <div class="table-scroll"><table class="table" id="analyze-signals-table"></table></div>
+      </div>
+      <div class="card stripe stripe--accent" id="analyze-explanation-card"></div>
+      <div class="card" id="analyze-links">
+        <div class="card-head">
+          <div><span class="eyebrow">Payload</span><h3>Body preview &amp; links</h3></div>
+        </div>
+        <pre id="analyze-body-pre"></pre>
+        <div class="divider"></div>
+        <div id="analyze-links-body"></div>
+      </div>
+      <div class="card" id="analyze-attachments">
+        <div class="card-head">
+          <div><span class="eyebrow">Files</span><h3>Attachments</h3></div>
+        </div>
+        <div id="analyze-attachments-body"></div>
+      </div>
+      <div class="card" id="analyze-raw">
+        <div class="card-head">
+          <div><span class="eyebrow">Custody source</span><h3>Raw headers</h3></div>
+          <button class="btn btn--ghost btn--sm" type="button" id="analyze-copy-raw">Copy raw headers</button>
+        </div>
+        <details id="analyze-raw-details">
+          <summary>Show full RFC 5322 header block</summary>
+          <pre id="analyze-raw-pre" style="margin-top:var(--s-3)"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+#screen-analyze .analyze-layout{
+  display: grid;
+  grid-template-columns: 360px minmax(0,1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+@media (max-width: 1080px){
+  #screen-analyze .analyze-layout{ grid-template-columns: minmax(0,1fr); }
+}
+#screen-analyze #analyze-ingest-col{
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--s-4));
+}
+@media (max-width: 1080px){
+  #screen-analyze #analyze-ingest-col{ position: static; }
+}
+#screen-analyze .analyze-progress{ display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+#screen-analyze .analyze-step{
+  display: flex; align-items: center; gap: var(--s-2);
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint);
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-2);
+  background: var(--surface-sunk);
+}
+#screen-analyze .analyze-step .dot{
+  width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--border-strong); flex: 0 0 auto;
+  transition: background var(--dur) ease;
+}
+#screen-analyze .analyze-step.is-active{ color: var(--text-2); border-color: var(--accent-dim); }
+#screen-analyze .analyze-step.is-active .dot{ background: var(--accent); }
+#screen-analyze .analyze-step.is-done{ color: var(--text-2); }
+#screen-analyze .analyze-step.is-done .dot{ background: var(--sev-safe); }
+#screen-analyze .analyze-step .ms{ margin-left: auto; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+#screen-analyze .verdict-top{ display: flex; gap: var(--s-5); align-items: center; flex-wrap: wrap; }
+#screen-analyze .verdict-meta{ min-width: 220px; flex: 1 1 260px; }
+#screen-analyze .verdict-meta h3{ margin-bottom: 6px; }
+#screen-analyze .verdict-actions{ margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+#screen-analyze .identity-flag{
+  margin-top: var(--s-3); padding: var(--s-3); border-radius: var(--r-2);
+  background: var(--surface-sunk); border: 1px solid var(--border);
+}
+#screen-analyze .identity-flag .eyebrow{ margin-bottom: var(--s-2); }
+#screen-analyze .identity-flag p{ margin: var(--s-2) 0 0; font-size: var(--fs-sm); }
+#screen-analyze .identity-flag .kv{ grid-template-columns: 138px minmax(0,1fr); }
+#screen-analyze .identity-reason{ font-size: var(--fs-sm); color: var(--text-2); }
+#screen-analyze .identity-reason + .identity-reason{ margin-top: 6px; }
+#screen-analyze mark.analyze-diff{
+  background: var(--sev-critical-wash); color: var(--sev-critical);
+  padding: 0 1px; border-radius: 2px; font-weight: 600;
+}
+#screen-analyze .auth-tile{ padding: var(--s-4); border-radius: var(--r-3); background: var(--surface-sunk); border: 1px solid var(--border); }
+#screen-analyze .auth-tile h4{ margin-bottom: 8px; }
+#screen-analyze .auth-tile p{ margin: 8px 0 0; font-size: var(--fs-sm); }
+#screen-analyze .link-block{
+  padding: var(--s-3) 0; border-top: 1px solid var(--border);
+}
+#screen-analyze .link-block:first-child{ border-top: none; padding-top: 0; }
+#screen-analyze .link-row{ display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 4px var(--s-3); font-size: var(--fs-sm); margin-bottom: 4px; }
+#screen-analyze .link-row dt{ font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: .08em; }
+#screen-analyze .link-row dd{ margin: 0; word-break: break-all; }
+#screen-analyze .zero-payload{
+  font-family: var(--font-display); font-weight: 600; letter-spacing: .04em;
+  color: var(--sev-medium); border-left: 3px solid var(--sev-medium);
+  padding: var(--s-3) var(--s-4); background: var(--sev-medium-wash); border-radius: var(--r-2);
+}
+</style>
+
+<script>(function(){
+  window.__screens = window.__screens || [];
+  var el;
+  var runTimer = null;
+
+  function prefersReduced(){
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function clearRun(){
+    window.clearTimeout(runTimer);
+    runTimer = null;
+  }
+
+  function domainOf(addr){
+    addr = String(addr || '');
+    var i = addr.indexOf('@');
+    return i >= 0 ? addr.slice(i + 1).toLowerCase() : addr.toLowerCase();
+  }
+
+  /* line-anchored so "To" cannot match "Delivered-To" etc. */
+  function parseHeader(raw, name){
+    var re = new RegExp('(?:^|\\n)' + name + ':[ \\t]*<?([^>\\n]*)>?', 'i');
+    var m = re.exec(raw || '');
+    return m ? m[1].trim() : null;
+  }
+
+  function firedSignal(email, engine){
+    return (email.signals || []).find(function(s){ return s.engine === engine && s.status === 'fired'; }) || null;
+  }
+
+  /* the lookalike engine states the pair in its evidence
+     ("educatlon-gov.in vs education.gov.in …") — pull both domains out of it */
+  function lookalikePair(email){
+    var sig = firedSignal(email, 'Lookalike/Homoglyph');
+    if (!sig) return null;
+    var toks = String(sig.evidence || '').match(/[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}/g) || [];
+    var uniq = [];
+    toks.forEach(function(t){ if (uniq.indexOf(t) < 0) uniq.push(t); });
+    if (uniq.length < 2) return null;
+    var sender = domainOf(email.from.address);
+    var observed = uniq[0], record = uniq[1];
+    if (observed !== sender && record === sender){ observed = uniq[1]; record = uniq[0]; }
+    return { observed: observed, record: record, evidence: sig.evidence, name: sig.name };
+  }
+
+  /* highlight the differing middle segment between two similar strings */
+  function diffHtml(ctx, a, b){
+    a = String(a || ''); b = String(b || '');
+    var i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    var j = 0; while (j < (a.length - i) && j < (b.length - i) && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
+    function mark(s){
+      var pre = s.slice(0, i), mid = s.slice(i, s.length - j), post = s.slice(s.length - j);
+      var out = ctx.fmt.escapeHtml(pre);
+      if (mid) out += '<mark class="analyze-diff">' + ctx.fmt.escapeHtml(mid) + '</mark>';
+      out += ctx.fmt.escapeHtml(post);
+      return out;
+    }
+    return { a: mark(a), b: mark(b) };
+  }
+
+  function verdictLinkClass(v){
+    return /^malicious/i.test(v) ? 'badge--critical' : /^suspicious/i.test(v) ? 'badge--high' : 'badge--safe';
+  }
+
+  function renderVerdict(ctx, email){
+    var sev = ctx.fmt.severity(email.riskScore);
+    var msgId = parseHeader(email.rawHeaders, 'Message-ID');
+    el.querySelector('#analyze-verdict-card').innerHTML =
+      '<div class="verdict-top">' +
+        '<div class="score-ring score-ring--lg score-ring--' + sev + '" style="--ring-val:' + Number(email.riskScore) + '">' +
+          '<span class="score-ring__val">' + ctx.fmt.escapeHtml(email.riskScore) + '</span>' +
+          '<span class="score-ring__cap">Risk</span>' +
+        '</div>' +
+        '<div class="verdict-meta">' +
+          '<span class="eyebrow">' + ctx.fmt.escapeHtml(email.id) + ' · ' + ctx.fmt.escapeHtml(ctx.fmt.date(email.receivedAt)) + '</span>' +
+          '<h3>' + ctx.fmt.escapeHtml(email.subject) + '</h3>' +
+          '<div class="row row--tight" style="margin-top:6px">' +
+            '<span class="badge ' + ctx.fmt.badgeClass(email.verdict) + '"><span class="badge__dot"></span>' + ctx.fmt.escapeHtml(email.verdict) + '</span>' +
+            '<span class="pill pill--accent">' + ctx.fmt.escapeHtml(email.category) + '</span>' +
+          '</div>' +
+          '<dl class="kv" style="margin-top:var(--s-3)">' +
+            '<dt>Message-ID</dt><dd class="mono">' + ctx.fmt.escapeHtml(msgId) + '</dd>' +
+            '<dt>Received</dt><dd>' + ctx.fmt.escapeHtml(ctx.fmt.date(email.receivedAt)) + '</dd>' +
+          '</dl>' +
+        '</div>' +
+      '</div>' +
+      '<div class="verdict-actions row row--tight">' +
+        '<button class="btn btn--primary btn--sm" type="button" data-act="open-case">Open case</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-act="trace-origin">Trace origin</button>' +
+        '<button class="btn btn--ghost btn--sm" type="button" data-act="block-sender">Block sender</button>' +
+        '<button class="btn btn--danger btn--sm" type="button" data-act="report-cert">Report to CERT-In</button>' +
+      '</div>';
+  }
+
+  function renderIdentity(ctx, email){
+    var returnPath = parseHeader(email.rawHeaders, 'Return-Path');
+    var fromAddr = email.from.address, replyTo = email.replyTo, to = email.to;
+    var domains = [domainOf(fromAddr), domainOf(replyTo), domainOf(returnPath)];
+    var distinct = Array.from(new Set(domains));
+    var mismatch = distinct.length > 1;
+    /* only mark differing characters when the addresses actually diverge —
+       red marks on an aligned sender would misread */
+    var diff = mismatch
+      ? diffHtml(ctx, fromAddr, replyTo)
+      : { a: ctx.fmt.escapeHtml(fromAddr), b: ctx.fmt.escapeHtml(replyTo) };
+    var dnSig = firedSignal(email, 'Display-Name Spoof');
+    var look = lookalikePair(email);
+    var flagged = mismatch || !!dnSig || !!look;
+
+    var reasons = '';
+    if (mismatch){
+      reasons += '<div class="identity-reason">From, Reply-To and Return-Path' +
+        ' resolve to ' + distinct.length + ' distinct domains (' + ctx.fmt.escapeHtml(distinct.join(', ')) +
+        ') — a reply or bounce leaves the domain the sender claims to be writing from.</div>';
+    }
+    if (dnSig){
+      reasons += '<div class="identity-reason">Display name vs address — ' + ctx.fmt.escapeHtml(dnSig.evidence) + '</div>';
+    }
+    if (!mismatch && !dnSig && look){
+      reasons += '<div class="identity-reason">From, Reply-To and Return-Path' +
+        ' are internally consistent, but the sending domain is not the domain of record — see the comparison above.</div>';
+    }
+    if (!flagged){
+      reasons += '<div class="identity-reason">From, Reply-To and Return-Path' +
+        ' all resolve to the same domain, and the display name matches the address domain.</div>';
+    }
+
+    var lookHtml = '';
+    if (look){
+      var ld = diffHtml(ctx, look.observed, look.record);
+      lookHtml =
+        '<div class="identity-flag stripe stripe--critical">' +
+          '<span class="eyebrow">Lookalike comparison · ' + ctx.fmt.escapeHtml(look.name) + '</span>' +
+          '<dl class="kv">' +
+            '<dt>Observed</dt><dd class="mono">' + ld.a + '</dd>' +
+            '<dt>Domain of record</dt><dd class="mono">' + ld.b + '</dd>' +
+          '</dl>' +
+          '<p class="muted">' + ctx.fmt.escapeHtml(look.evidence) + '</p>' +
+        '</div>';
+    }
+
+    var html =
+      '<div class="card-head"><div><span class="eyebrow">Sender identity check</span><h3>Identity</h3></div>' +
+      '<span class="badge ' + (flagged ? 'badge--high' : 'badge--safe') + '"><span class="badge__dot"></span>' +
+      (flagged ? 'Divergence' : 'Consistent') + '</span></div>' +
+      '<dl class="kv">' +
+        '<dt>From (display)</dt><dd>' + ctx.fmt.escapeHtml(email.from.display) + '</dd>' +
+        '<dt>From (address)</dt><dd class="mono">' + diff.a + '</dd>' +
+        '<dt>Reply-To</dt><dd class="mono">' + diff.b + '</dd>' +
+        '<dt>Return-Path</dt><dd class="mono">' + ctx.fmt.escapeHtml(returnPath) + '</dd>' +
+        '<dt>To</dt><dd class="mono">' + ctx.fmt.escapeHtml(to) + '</dd>' +
+      '</dl>' +
+      lookHtml +
+      '<div class="identity-flag stripe ' + (flagged ? 'stripe--critical' : 'stripe--safe') + '">' + reasons + '</div>';
+    el.querySelector('#analyze-identity-card').innerHTML = html;
+  }
+
+  function authSevClass(result){
+    return ({ pass: 'badge--safe', fail: 'badge--critical' })[String(result || '').toLowerCase()] || 'badge--medium';
+  }
+
+  function renderAuth(ctx, email){
+    var html = '<div class="card-head"><div><span class="eyebrow">Authentication</span><h3>SPF / DKIM / DMARC</h3></div></div><div class="grid-3">';
+    ['spf', 'dkim', 'dmarc'].forEach(function(k){
+      var a = email.auth[k];
+      html +=
+        '<div class="auth-tile">' +
+          '<h4>' + k.toUpperCase() + '</h4>' +
+          '<span class="badge ' + authSevClass(a.result) + '"><span class="badge__dot"></span>' + ctx.fmt.escapeHtml(a.result) + '</span>' +
+          '<p class="muted">' + ctx.fmt.escapeHtml(a.detail) + '</p>' +
+        '</div>';
+    });
+    html += '</div>';
+    el.querySelector('#analyze-auth-card').innerHTML = html;
+  }
+
+  function renderSignals(ctx, email){
+    var signals = email.signals.slice().sort(function(a, b){
+      return (b.status === 'fired') - (a.status === 'fired') || b.weight - a.weight;
+    });
+    /* absolute scale (corpus weights run 0-25) so the same weight reads the same
+       colour and bar length on every email — relative-to-max would paint the
+       heaviest signal of a Safe message critical red */
+    var scaleMax = Math.max(25, Math.max.apply(null, signals.map(function(s){ return s.weight; })));
+    var total = signals.reduce(function(sum, s){ return sum + (s.status === 'fired' ? s.weight : 0); }, 0);
+    var rows = signals.map(function(s){
+      var w = Number(s.weight) || 0;
+      var sev = w >= 20 ? 'critical' : w >= 14 ? 'high' : w >= 8 ? 'medium' : w > 0 ? 'low' : 'safe';
+      var statusHtml = s.status === 'fired'
+        ? '<span class="badge badge--' + sev + '"><span class="badge__dot"></span>fired</span>'
+        : '<span class="badge badge--safe"><span class="badge__dot"></span>clear</span>';
+      return '<tr>' +
+        '<td>' + ctx.fmt.escapeHtml(s.name) + '<div class="muted mono" style="font-size:var(--fs-xs)">' + ctx.fmt.escapeHtml(s.id) + '</div></td>' +
+        '<td>' + ctx.fmt.escapeHtml(s.engine) + '</td>' +
+        '<td class="num"><div class="row row--tight" style="justify-content:flex-end"><span class="mono">' + ctx.fmt.escapeHtml(s.weight) + '</span>' +
+          '<div class="meter" style="width:64px"><span class="meter__fill meter__fill--' + sev + '" style="width:' + Math.round(w / scaleMax * 100) + '%"></span></div></div></td>' +
+        '<td>' + statusHtml + '</td>' +
+        '<td class="mono">' + ctx.fmt.escapeHtml(s.evidence) + '</td>' +
+      '</tr>';
+    }).join('');
+    el.querySelector('#analyze-signals-table').innerHTML =
+      '<thead><tr><th scope="col">Signal</th><th scope="col">Engine</th><th scope="col" class="num">Weight</th><th scope="col">Status</th><th scope="col">Evidence</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '<tfoot><tr><td colspan="2" class="muted">Total fired contribution</td>' +
+        '<td class="num mono">' + ctx.fmt.escapeHtml(total) + '</td>' +
+        '<td colspan="2" class="muted">Meta-model score: <span class="mono">' + ctx.fmt.escapeHtml(email.riskScore) + '</span> / 100</td></tr></tfoot>';
+  }
+
+  function renderExplanation(ctx, email){
+    el.querySelector('#analyze-explanation-card').innerHTML =
+      '<span class="eyebrow">Explainable verdict</span>' +
+      '<h3>AI analyst narrative</h3>' +
+      '<p>' + ctx.fmt.escapeHtml(email.aiExplanation) + '</p>';
+  }
+
+  function renderLinks(ctx, email){
+    el.querySelector('#analyze-body-pre').textContent = email.bodyText;
+    var host = el.querySelector('#analyze-links-body');
+    if (!email.links.length){
+      host.innerHTML = '<div class="zero-payload">Zero payload — no URLs, no attachments. The attack is language alone.</div>';
+      return;
+    }
+    host.innerHTML = email.links.map(function(l){
+      var hops = l.redirects || [];
+      var chain = hops.length
+        ? hops.map(function(r){ return ctx.fmt.escapeHtml(r); }).join(' → ')
+        : '<span class="muted">none — the anchor resolves directly to its destination</span>';
+      var anchorMatch = String(l.shown) === String(l.actual);
+      return '<div class="link-block">' +
+        '<dl class="link-row"><dt>Shown</dt><dd>' + ctx.fmt.escapeHtml(l.shown) + '</dd></dl>' +
+        '<dl class="link-row"><dt>Actual</dt><dd class="mono">' + ctx.fmt.escapeHtml(l.actual) +
+          (anchorMatch ? '' : ' <span class="muted">(does not match the shown text)</span>') + '</dd></dl>' +
+        '<dl class="link-row"><dt>Redirects</dt><dd class="mono">' + chain + '</dd></dl>' +
+        '<span class="badge ' + verdictLinkClass(l.verdict) + '"><span class="badge__dot"></span>' + ctx.fmt.escapeHtml(l.verdict) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderAttachments(ctx, email){
+    var host = el.querySelector('#analyze-attachments-body');
+    if (!email.attachments.length){
+      host.innerHTML = '<p class="muted">No attachments in this message.</p>';
+      return;
+    }
+    var rows = email.attachments.map(function(a, idx){
+      return '<tr>' +
+        '<td>' + ctx.fmt.escapeHtml(a.name) + '</td>' +
+        '<td class="mono">' + ctx.fmt.escapeHtml(a.type) + '</td>' +
+        '<td class="hash" title="' + ctx.fmt.escapeHtml(a.sha256) + '">' + ctx.fmt.escapeHtml(a.sha256.slice(0, 12) + '…' + a.sha256.slice(-8)) + '</td>' +
+        '<td><span class="badge ' + verdictLinkClass(a.verdict) + '"><span class="badge__dot"></span>' + ctx.fmt.escapeHtml(a.verdict) + '</span></td>' +
+        '<td><button class="btn btn--ghost btn--sm" type="button" data-copy-hash="' + idx + '">Copy hash</button></td>' +
+      '</tr>';
+    }).join('');
+    host.innerHTML = '<div class="table-scroll"><table class="table">' +
+      '<thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">SHA-256</th><th scope="col">Verdict</th><th scope="col">Action</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
+    host.querySelectorAll('[data-copy-hash]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var a = email.attachments[Number(btn.getAttribute('data-copy-hash'))];
+        navigator.clipboard && navigator.clipboard.writeText(a.sha256).catch(function(){});
+        ctx.toast('SHA-256 for ' + a.name + ' copied to clipboard.', 'Attachment hash');
+      });
+    });
+  }
+
+  function resetProgress(){
+    var steps = ['Parsing headers & MIME', 'Authenticating SPF / DKIM / DMARC', 'Running NLP intent & lookalike engines', 'Threat-intel enrichment', 'Meta-model scoring'];
+    el.querySelector('#analyze-progress').innerHTML = steps.map(function(s){
+      return '<div class="analyze-step"><span class="dot"></span><span>' + s + '</span></div>';
+    }).join('');
+  }
+
+  function renderAll(ctx, email){
+    renderVerdict(ctx, email);
+    renderIdentity(ctx, email);
+    renderAuth(ctx, email);
+    renderSignals(ctx, email);
+    renderExplanation(ctx, email);
+    renderLinks(ctx, email);
+    renderAttachments(ctx, email);
+    el.querySelector('#analyze-raw-pre').textContent = email.rawHeaders;
+  }
+
+  function runAnalysis(ctx, email){
+    var runBtn = el.querySelector('#analyze-run-btn');
+    /* reported stage costs stay truthful; only the wall-clock wait collapses
+       under prefers-reduced-motion */
+    var costs = [220, 260, 340, 240, 180];
+    var reduced = prefersReduced();
+    var total = costs.reduce(function(a, b){ return a + b; }, 0);
+    clearRun();
+    runBtn.disabled = true;
+    resetProgress();
+    var steps = el.querySelectorAll('#analyze-progress .analyze-step');
+    var i = 0;
+    function step(){
+      runTimer = null;
+      if (i > 0){
+        steps[i - 1].classList.remove('is-active');
+        steps[i - 1].classList.add('is-done');
+        var ms = document.createElement('span');
+        ms.className = 'ms';
+        ms.textContent = costs[i - 1] + ' ms';
+        steps[i - 1].appendChild(ms);
+      }
+      if (i >= steps.length){
+        runBtn.disabled = false;
+        ctx.toast('Verdict ' + email.verdict + ' (' + email.riskScore + '/100) confirmed in ' +
+          (total / 1000).toFixed(2) + ' s across 5 stages.', 'Run analysis · ' + email.id);
+        return;
+      }
+      steps[i].classList.add('is-active');
+      var wait = reduced ? 0 : costs[i];
+      i++;
+      runTimer = window.setTimeout(step, wait);
+    }
+    step();
+  }
+
+  window.__screens.push(['analyze', {
+    mount: function (root, ctx) {
+      el = root;
+
+      el.querySelector('#analyze-run-btn').addEventListener('click', function(){
+        runAnalysis(ctx, ctx.email());
+      });
+
+      el.querySelector('#analyze-upload-btn').addEventListener('click', function(ev){
+        /* keep the dropzone handler from firing a second toast */
+        ev.stopPropagation();
+        ctx.toast('Upload is simulated in this prototype — pick a sample or edit the pasted source instead.', 'Upload .eml');
+      });
+      var dz = el.querySelector('#analyze-dropzone');
+      dz.addEventListener('click', function(){
+        ctx.toast('Drag-and-drop ingest is simulated in this prototype — use Upload .eml or the top-bar sample picker.', 'Ingest');
+      });
+      dz.addEventListener('dragover', function(ev){ ev.preventDefault(); });
+      dz.addEventListener('drop', function(ev){
+        ev.preventDefault();
+        ctx.toast('Drag-and-drop ingest is simulated in this prototype.', 'Ingest');
+      });
+
+      el.querySelector('#analyze-source-select').addEventListener('change', function(e){
+        ctx.toast('Ingest source set to "' + e.target.selectedOptions[0].textContent + '" for the next run.', 'Ingest source');
+      });
+
+      el.querySelector('#analyze-copy-raw').addEventListener('click', function(){
+        var email = ctx.email();
+        navigator.clipboard && navigator.clipboard.writeText(email.rawHeaders).catch(function(){});
+        ctx.toast('Raw header block for ' + email.id + ' copied to clipboard.', 'Raw headers');
+      });
+
+      el.addEventListener('click', function(ev){
+        var jump = ev.target.closest('[data-jump]');
+        if (jump){
+          var target = document.getElementById(jump.getAttribute('data-jump'));
+          if (target) target.scrollIntoView({ behavior: prefersReduced() ? 'auto' : 'smooth', block: 'start' });
+          return;
+        }
+        var act = ev.target.closest('[data-act]');
+        if (!act) return;
+        var email = ctx.email();
+        switch (act.getAttribute('data-act')){
+          case 'open-case': ctx.go('forensics'); break;
+          case 'trace-origin': ctx.go('trace'); break;
+          case 'block-sender':
+            ctx.toast(email.from.address + ' pushed to the gateway sender blocklist.', 'Block sender');
+            break;
+          case 'report-cert':
+            ctx.toast('Incident package for ' + email.id + ' queued for CERT-In submission.', 'Report to CERT-In');
+            break;
+        }
+      });
+    },
+    onSelect: function (email, ctx) {
+      clearRun();
+      el.querySelector('#analyze-raw-textarea').value = email.rawHeaders + '\n\n' + email.bodyText;
+      resetProgress();
+      el.querySelector('#analyze-run-btn').disabled = false;
+      renderAll(ctx, email);
+    }
+  }]);
+})();</script>

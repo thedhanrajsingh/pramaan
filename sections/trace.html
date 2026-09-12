@@ -1,0 +1,610 @@
+<section class="screen" id="screen-trace" hidden aria-labelledby="trace-title">
+  <div class="screen__head">
+    <div>
+      <span class="eyebrow">Attribution · hop-by-hop</span>
+      <h2 class="screen__title" id="trace-title">Origin trace &amp; attribution</h2>
+    </div>
+  </div>
+
+  <div class="stack">
+
+    <div class="grid-2" id="trace-map-row">
+      <!-- 1. World map -->
+      <div class="card card--flush" id="trace-map-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow" id="trace-map-eyebrow">Hop path</span>
+            <h3>Injection-to-delivery route</h3>
+          </div>
+        </div>
+        <div class="trace-map-wrap">
+          <svg id="trace-map" viewBox="0 0 960 480" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="trace-map-desc">
+            <desc id="trace-map-desc">Equirectangular world map with numbered relay hops joined by arcs</desc>
+          </svg>
+        </div>
+        <div class="trace-map-legend mono" id="trace-map-legend"></div>
+      </div>
+
+      <!-- 2. Origin card -->
+      <div class="card stripe" id="trace-origin-card">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Probable origin</span>
+            <h3 id="trace-origin-place">—</h3>
+          </div>
+          <span class="pill" id="trace-origin-ip-pill">—</span>
+        </div>
+        <dl class="kv" id="trace-origin-kv"></dl>
+        <div class="trace-origin-conf">
+          <div class="row row--between">
+            <span class="muted" style="font-size:var(--fs-xs)">Confidence</span>
+            <span class="mono" id="trace-origin-conf-val">—</span>
+          </div>
+          <div class="meter"><span class="meter__fill" id="trace-origin-conf-fill"></span></div>
+        </div>
+        <div class="row row--tight" id="trace-origin-flags" style="margin-top:var(--s-3)"></div>
+        <div class="divider"></div>
+        <p class="muted" style="font-size:var(--fs-xs);margin:0">
+          <strong>What this does not prove:</strong> geolocation identifies the network that injected
+          the message, not the individual who typed it — an origin IP can be a rented VPS, an open
+          relay, or a compromised host operated by someone else entirely.
+        </p>
+      </div>
+    </div>
+
+    <!-- 3. Hop table -->
+    <div class="card card--flush">
+      <div class="card-head">
+        <div>
+          <span class="eyebrow">Received chain, bottom-up</span>
+          <h3>Hop-by-hop stepper</h3>
+        </div>
+        <span class="muted" id="trace-hop-count" style="font-size:var(--fs-xs)"></span>
+      </div>
+      <div class="table-scroll">
+        <table class="table" id="trace-hop-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Host</th>
+              <th scope="col">IP</th>
+              <th scope="col">ASN / org</th>
+              <th scope="col">City / country</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col" class="num">Delay</th>
+              <th scope="col">TLS</th>
+              <th scope="col">Flags</th>
+            </tr>
+          </thead>
+          <tbody id="trace-hop-tbody"></tbody>
+        </table>
+      </div>
+      <div class="trace-contradiction" id="trace-contradiction" aria-live="polite"></div>
+    </div>
+
+    <div class="grid-2">
+      <!-- 5. IOC table -->
+      <div class="card card--flush">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Indicators of compromise</span>
+            <h3>IOC table</h3>
+          </div>
+          <button type="button" class="btn btn--ghost btn--sm" id="trace-btn-export-ioc-2">Export IOC set (CSV)</button>
+        </div>
+        <div id="trace-ioc-body" aria-live="polite"></div>
+      </div>
+
+      <!-- 6. Related campaigns -->
+      <div class="card card--flush">
+        <div class="card-head">
+          <div>
+            <span class="eyebrow">Infrastructure clustering</span>
+            <h3>Related campaigns</h3>
+          </div>
+        </div>
+        <div id="trace-campaigns-body"></div>
+      </div>
+    </div>
+
+    <!-- Raw Received headers -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <span class="eyebrow">Evidence</span>
+          <h3>Raw Received headers</h3>
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" id="trace-btn-copy-headers">Copy raw source</button>
+      </div>
+      <p class="muted" style="font-size:var(--fs-xs);margin:0 0 var(--s-3)">Hover a hop row above to highlight its parsed lines below.</p>
+      <pre id="trace-raw-headers" class="trace-raw"></pre>
+    </div>
+
+  </div>
+</section>
+
+<style>
+#screen-trace .trace-map-wrap{ background: var(--surface-sunk); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: var(--s-3); }
+#screen-trace svg#trace-map{ width: 100%; height: auto; display: block; }
+#screen-trace #trace-map-row{ grid-template-columns: minmax(0,1.75fr) minmax(0,1fr); }
+@media (max-width: 1180px){ #screen-trace #trace-map-row{ grid-template-columns: minmax(0,1fr); } }
+#screen-trace .trace-map-legend{ display: flex; flex-wrap: wrap; gap: var(--s-4); padding: var(--s-3) var(--s-4); font-size: var(--fs-xs); color: var(--text-muted); }
+#screen-trace .trace-map-legend i{ width: 9px; height: 9px; border-radius: var(--r-pill); display: inline-block; }
+#screen-trace .trace-origin-conf{ margin-top: var(--s-3); }
+#screen-trace .trace-origin-conf .meter{ margin-top: 4px; }
+#screen-trace .kv{ grid-template-columns: 104px minmax(0,1fr); }
+#screen-trace .trace-contradiction{ padding: var(--s-4); border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+#screen-trace .trace-contradiction .lbl{ font-family: var(--font-mono); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .1em; color: var(--text-faint); display: block; margin-bottom: 4px; }
+#screen-trace tr.trace-hop-row.is-origin td{ background: var(--sev-critical-wash); }
+#screen-trace tr.trace-hop-row.is-origin.is-origin-benign td{ background: var(--sev-safe-wash); }
+#screen-trace tr.trace-hop-row.is-trusted td{ background: var(--sev-safe-wash); }
+#screen-trace tr.trace-hop-row:hover td, #screen-trace tr.trace-hop-row:focus td{ background: var(--accent-wash); }
+#screen-trace .trace-flags{ min-width: 200px; }
+#screen-trace .trace-flags .badge{ white-space: normal; text-align: left; }
+#screen-trace #trace-hop-table td.num, #screen-trace #trace-hop-table td.mono{ white-space: nowrap; }
+#screen-trace .ioc-row, #screen-trace .cmp-row{ display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); }
+#screen-trace .cmp-row{ flex-wrap: wrap; row-gap: var(--s-2); }
+#screen-trace .ioc-row:last-child, #screen-trace .cmp-row:last-child{ border-bottom: none; }
+#screen-trace .ioc-val{ font-size: var(--fs-xs); color: var(--text-2); word-break: break-all; flex: 1 1 auto; min-width: 0; }
+#screen-trace .ioc-meter-wrap{ width: 90px; flex: 0 0 auto; }
+#screen-trace .ioc-src{ width: 150px; flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text-faint); }
+#screen-trace .cmp-name{ flex: 1 1 100%; min-width: 0; }
+#screen-trace .cmp-name b{ display: block; font-size: var(--fs-sm); color: var(--text); font-weight: 600; }
+#screen-trace .cmp-name span{ font-size: var(--fs-xs); color: var(--text-faint); }
+#screen-trace .cmp-meter-wrap{ width: 110px; flex: 0 0 auto; }
+#screen-trace .cmp-seen{ width: 126px; flex: 0 0 auto; white-space: nowrap; font-size: var(--fs-xs); color: var(--text-faint); }
+#screen-trace .cmp-count{ width: 74px; flex: 0 0 auto; white-space: nowrap; text-align: right; font-size: var(--fs-xs); color: var(--text-2); }
+#screen-trace .trace-empty{ padding: var(--s-5); color: var(--text-muted); font-size: var(--fs-sm); }
+#screen-trace .trace-raw{ max-height: 320px; overflow-y: auto; }
+#screen-trace .trace-raw .hl{ background: var(--accent-wash); color: var(--text); display: inline-block; width: 100%; }
+#screen-trace .hop-city-label{ font-size: 10px; fill: var(--text-2); }
+</style>
+
+<script>(function(){
+  window.__screens = window.__screens || [];
+
+  var root;                 /* captured on mount for reuse in onSelect */
+  var MAP_W = 960, MAP_H = 480;
+  var SKEW_TOLERANCE_MS = 5000;
+
+  /* ---------------- helpers ---------------- */
+
+  function isBenign(email){ return email.verdict === 'Safe'; }
+
+  function hopIsTrusted(hop){
+    return hop.flags.join(' ').toLowerCase().indexOf('trusted') >= 0;
+  }
+
+  function f1(n){ return Number(n).toFixed(1); }
+
+  /* a flag counts as an anomaly unless it explicitly records a clean result */
+  function flagIsAnomalous(flag){
+    var s = String(flag);
+    if (/ptr matches helo|matches helo|allow-listed|trusted|domain of record/i.test(s)) return false;
+    return /no ptr|residential|open relay|does not match|mismatch|forged|evasion|localhost|compromis|bulletproof|attacker|spamhaus|sbl|abuseipdb|no opportunistic tls|plaintext|bulk sender|prior campaigns|prior samples/i.test(s);
+  }
+
+  /* a timestamp-skew anomaly is not in the flag list but falls out of the numbers */
+  function derivedAnomalies(email, i){
+    var hops = email.hops, h = hops[i], out = [];
+    if (i > 0) {
+      var observed = new Date(h.timestamp) - new Date(hops[i - 1].timestamp);
+      var declared = Number(h.delayMs);
+      if (!isNaN(observed) && Math.abs(observed - declared) > SKEW_TOLERANCE_MS) {
+        out.push({
+          label: 'timestamp skew',
+          title: 'Stamped gap ' + Math.round(observed / 1000) + ' s vs measured delay ' +
+            Math.round(declared / 1000) + ' s - the two relay clocks disagree.'
+        });
+      }
+    }
+    return out;
+  }
+
+  function hopsSummary(email){
+    var hops = email.hops, first = hops[0], last = hops[hops.length - 1];
+    return hops.length + ' hops · ' + first.city + ' (' + first.countryCode + ') → ' +
+      last.city + ' (' + last.countryCode + ')';
+  }
+
+  /* ---------------- map drawing ---------------- */
+
+  /* hops that project to the same pixel (same city) share one marker */
+  function hopClusters(email){
+    var project = window.EFP_MAP.project;
+    var byKey = {}, clusters = [];
+    email.hops.forEach(function (h, i) {
+      var p = project(h.lat, h.lon, MAP_W, MAP_H);
+      var key = f1(p.x) + ':' + f1(p.y);
+      if (byKey[key]) { byKey[key].indices.push(i); }
+      else { byKey[key] = { x: p.x, y: p.y, hop: h, indices: [i] }; clusters.push(byKey[key]); }
+    });
+    return clusters;
+  }
+
+  function buildMapSvg(ctx, email){
+    var project = window.EFP_MAP.project;
+    var land = window.EFP_MAP.land;
+    var esc = ctx.fmt.escapeHtml;
+    var parts = [];
+
+    parts.push('<desc id="trace-map-desc">' + esc('Equirectangular world map. ' + hopsSummary(email) +
+      '. Numbered markers follow transfer order; marker 1 is the first external hop, and hops in the same city share one marker.') +
+      '</desc>');
+
+    /* graticule */
+    var grat = [], lon, lat, a, b, c, d;
+    for (lon = -180; lon <= 180; lon += 30) {
+      a = project(84, lon, MAP_W, MAP_H); b = project(-84, lon, MAP_W, MAP_H);
+      grat.push('M' + f1(a.x) + ' ' + f1(a.y) + 'L' + f1(b.x) + ' ' + f1(b.y));
+    }
+    for (lat = -60; lat <= 60; lat += 30) {
+      c = project(lat, -180, MAP_W, MAP_H); d = project(lat, 180, MAP_W, MAP_H);
+      grat.push('M' + f1(c.x) + ' ' + f1(c.y) + 'L' + f1(d.x) + ' ' + f1(d.y));
+    }
+    parts.push('<path d="' + grat.join(' ') + '" stroke="var(--grid-line)" stroke-width="1" fill="none"/>');
+
+    /* land polygons */
+    land.forEach(function (poly) {
+      var path = poly.map(function (pt, i) {
+        var p = project(pt[0], pt[1], MAP_W, MAP_H);
+        return (i === 0 ? 'M' : 'L') + f1(p.x) + ' ' + f1(p.y);
+      }).join(' ') + 'Z';
+      parts.push('<path d="' + path + '" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1"/>');
+    });
+
+    var clusters = hopClusters(email);
+
+    /* arcs between consecutive distinct locations (co-located hops need no arc) */
+    for (var i = 0; i < clusters.length - 1; i++) {
+      var p0 = clusters[i], p1 = clusters[i + 1];
+      var lift = Math.min(70, Math.abs(p1.x - p0.x) * 0.22 + 20);
+      var mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2 - lift;
+      parts.push('<path d="M' + f1(p0.x) + ' ' + f1(p0.y) + ' Q ' + f1(mx) + ' ' + f1(my) +
+        ' ' + f1(p1.x) + ' ' + f1(p1.y) + '" stroke="var(--accent)" stroke-width="1.6" fill="none"/>');
+    }
+
+    var benign = isBenign(email);
+    var originFill = benign ? 'var(--sev-safe)' : 'var(--sev-critical)';
+
+    /* label placement: keep every label inside the viewBox and off the other
+       labels (Amsterdam/Frankfurt and Bucharest/Sofia are only ~10 user units
+       apart, so a fixed offset would overlap) */
+    var taken = [];
+    function placeLabel(cx, cy, r, text, size){
+      var w = text.length * size * 0.6, h = size + 3;
+      var x = Math.max(4, Math.min(MAP_W - w - 4, cx - w / 2));
+      var step = h + 3;
+      var cands = [cy - r - 8, cy + r + step, cy - r - 8 - step, cy + r + 2 * step,
+                   cy - r - 8 - 2 * step, cy + r + 3 * step];
+      for (var i = 0; i < cands.length; i++) {
+        var box = { x: x, y: cands[i] - size, w: w, h: h };
+        if (box.y < 2 || box.y + h > MAP_H - 2) continue;
+        var clash = false;
+        for (var k = 0; k < taken.length && !clash; k++) {
+          var q = taken[k];
+          clash = box.x < q.x + q.w && q.x < box.x + box.w && box.y < q.y + q.h && q.y < box.y + box.h;
+        }
+        if (!clash) { taken.push(box); return { x: x + w / 2, y: cands[i] }; }
+      }
+      taken.push({ x: x, y: cands[0] - size, w: w, h: h });
+      return { x: x + w / 2, y: cands[0] };
+    }
+
+    clusters.forEach(function (cl) {
+      var hasOrigin = cl.indices.indexOf(0) >= 0;
+      var nums = cl.indices.map(function (n) { return n + 1; }).join('·');
+      var r = hasOrigin ? 10 : 6.5;
+      if (cl.indices.length > 1) r = Math.max(r, 7 + cl.indices.length * 3.4);
+      var fill = hasOrigin ? originFill : 'var(--accent)';
+      var size = hasOrigin ? 15 : 13;
+      var text = nums + ' ' + cl.hop.city + ' (' + cl.hop.countryCode + ')';
+      var lab = placeLabel(cl.x, cl.y, r, text, size);
+
+      parts.push('<circle cx="' + f1(cl.x) + '" cy="' + f1(cl.y) + '" r="' + f1(r + 3) +
+        '" fill="' + fill + '" opacity="0.18"/>');
+      parts.push('<circle cx="' + f1(cl.x) + '" cy="' + f1(cl.y) + '" r="' + f1(r) +
+        '" fill="' + fill + '" stroke="var(--surface)" stroke-width="1.5"/>');
+      parts.push('<text x="' + f1(lab.x) + '" y="' + f1(lab.y) +
+        '" text-anchor="middle" class="hop-city-label mono" font-size="' + size + '">' + esc(text) + '</text>');
+      parts.push('<text x="' + f1(cl.x) + '" y="' + f1(cl.y + 3.5) +
+        '" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="var(--text-on-accent)" font-weight="700">' +
+        nums + '</text>');
+    });
+
+    return parts.join('');
+  }
+
+  function renderMap(ctx, email){
+    var svg = root.querySelector('#trace-map');
+    var legend = root.querySelector('#trace-map-legend');
+    root.querySelector('#trace-map-eyebrow').textContent = hopsSummary(email);
+
+    svg.innerHTML = buildMapSvg(ctx, email);
+
+    var benign = isBenign(email);
+    var sevWord = benign ? 'origin (benign sender of record)' : 'origin (' + String(email.verdict).toLowerCase() + ')';
+    legend.innerHTML =
+      '<span class="row row--tight"><i style="background:var(--surface-2);border:1px solid var(--border-strong)"></i>Land mass</span>' +
+      '<span class="row row--tight"><i style="background:var(--accent)"></i>Relay hop</span>' +
+      '<span class="row row--tight"><i style="background:' + (benign ? 'var(--sev-safe)' : 'var(--sev-critical)') + '"></i>' +
+        ctx.fmt.escapeHtml(sevWord) + '</span>' +
+      '<span class="row row--tight"><i style="background:var(--grid-line)"></i>Graticule, 30&deg;</span>' +
+      '<span class="row row--tight">Marker number = transfer order; one marker per city</span>';
+  }
+
+  /* ---------------- origin card ---------------- */
+
+  function renderOrigin(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var origin = email.origin;
+    var sev = ctx.fmt.severity(email.riskScore);
+    var card = root.querySelector('#trace-origin-card');
+    card.className = 'card stripe stripe--' + sev;
+
+    root.querySelector('#trace-origin-place').textContent = origin.city + ', ' + origin.country;
+    root.querySelector('#trace-origin-ip-pill').innerHTML =
+      '<span class="mono">' + esc(origin.ip) + '</span>';
+
+    root.querySelector('#trace-origin-kv').innerHTML =
+      '<dt>Method</dt><dd>' + esc(origin.method) + '</dd>';
+
+    var conf = Number(origin.confidence);
+    root.querySelector('#trace-origin-conf-val').textContent = ctx.fmt.pct(conf);
+    var fill = root.querySelector('#trace-origin-conf-fill');
+    fill.style.width = Math.round(conf * 100) + '%';
+    fill.className = 'meter__fill meter__fill--' + sev;
+
+    var flagsHost = root.querySelector('#trace-origin-flags');
+    var flags = email.hops[0].flags;
+    flagsHost.innerHTML = flags.map(function (fl) {
+      return '<span class="pill' + (flagIsAnomalous(fl) ? '' : ' pill--accent') + '">' + esc(fl) + '</span>';
+    }).join('');
+  }
+
+  /* ---------------- hop table ---------------- */
+
+  function renderHopTable(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var tbody = root.querySelector('#trace-hop-tbody');
+    var hops = email.hops;
+    var benign = isBenign(email);
+    root.querySelector('#trace-hop-count').textContent = hops.length + ' hop' + (hops.length === 1 ? '' : 's');
+
+    tbody.innerHTML = hops.map(function (h, i) {
+      var isOrigin = (i === 0);
+      var isTrusted = hopIsTrusted(h);
+      var rowCls = 'trace-hop-row' +
+        (isOrigin ? ' is-origin' : '') +
+        (isOrigin && benign ? ' is-origin-benign' : '') +
+        (isTrusted ? ' is-trusted' : '');
+
+      var flagBadges = h.flags.map(function (fl) {
+        var cls = flagIsAnomalous(fl) ? 'badge--high' : (isTrusted ? 'badge--safe' : 'badge--info');
+        return '<span class="badge ' + cls + '">' + esc(fl) + '</span>';
+      }).concat(derivedAnomalies(email, i).map(function (a) {
+        return '<span class="badge badge--high" title="' + esc(a.title) + '">' + esc(a.label) + '</span>';
+      })).join('');
+
+      var originBadge = isOrigin
+        ? '<span class="badge ' + (benign ? 'badge--info' : 'badge--critical') + '">origin</span>'
+        : (isTrusted ? '<span class="badge badge--safe">trusted</span>' : '');
+
+      var tlsBadge = (h.tls && h.tls !== 'none')
+        ? '<span class="badge badge--safe">' + esc(h.tls) + '</span>'
+        : '<span class="badge badge--high" title="No transport encryption recorded for this transfer.">none</span>';
+
+      return '<tr class="' + rowCls + '" data-hop-index="' + i + '" tabindex="0">' +
+        '<td class="mono num">' + (i + 1) + '</td>' +
+        '<td class="mono">' + esc(h.host) + (originBadge ? '<br>' + originBadge : '') + '</td>' +
+        '<td class="mono">' + esc(h.ip) + '</td>' +
+        '<td>' + esc(h.asn) + '<br><span class="muted" style="font-size:var(--fs-xs)">' + esc(h.org) + '</span></td>' +
+        '<td>' + esc(h.city) + ', ' + esc(h.countryCode) + '</td>' +
+        '<td class="mono">' + ctx.fmt.time(h.timestamp) + '</td>' +
+        '<td class="mono num">' + ctx.fmt.ms(h.delayMs) + '</td>' +
+        '<td>' + tlsBadge + '</td>' +
+        '<td><div class="trace-flags row row--tight">' + flagBadges + '</div></td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  /* ---------------- contradiction note ---------------- */
+
+  function renderContradiction(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var host = root.querySelector('#trace-contradiction');
+    var hops = email.hops;
+    var hop0 = hops[0];
+    var flags = hop0.flags;
+    var note = null, label = 'geo/HELO mismatch';
+
+    /* "PTR matches HELO" is a clean result, not a contradiction */
+    var heloClaim = flags.find(function (fl) {
+      return /helo/i.test(fl) && !/matches helo|ptr matches/i.test(fl);
+    });
+    var netKind = flags.find(function (fl) {
+      return /residential|datacentre|datacenter|cloud tenant|compromis/i.test(fl);
+    });
+    var relayFlags = hops.slice(1).reduce(function (acc, h) { return acc.concat(h.flags); }, []);
+    var evasion = relayFlags.find(function (fl) { return /evasion|in-country relay/i.test(fl); });
+
+    if (heloClaim) {
+      note = 'First external hop: ' + heloClaim + ' — the transfer was observed from ' +
+        (netKind || 'the recorded network') + ' in ' + hop0.city + ', ' + hop0.country +
+        ' (' + hop0.ip + ', ' + hop0.asn + ' ' + hop0.org + ').';
+    } else if (evasion) {
+      label = 'relay laundering';
+      note = 'Injection came from ' + hop0.city + ', ' + hop0.country + ' (' + hop0.ip +
+        '), then the message was passed through a relay flagged "' + evasion +
+        '" so it would look domestic to the recipient gateway.';
+    } else if (!isBenign(email)) {
+      label = 'sender/origin divergence';
+      note = 'The displayed sender identity is not corroborated by the network that injected the message: ' +
+        'the first external hop is ' + hop0.city + ', ' + hop0.country + ' (' + hop0.org + ', ' + hop0.asn + ').';
+    }
+
+    if (note) {
+      host.innerHTML = '<span class="lbl">Contradiction detected</span>' +
+        '<span class="badge badge--high" style="margin-right:8px">' + esc(label) + '</span>' +
+        '<span>' + esc(note) + '</span>';
+    } else {
+      host.innerHTML = '<span class="lbl">Chain consistency</span>' +
+        '<span class="badge badge--safe" style="margin-right:8px">internally consistent</span>' +
+        '<span class="muted">' +
+        esc('The first external hop is an allow-listed relay whose PTR matches its HELO, every later hop is a trusted recipient system, and TLS is unbroken — nothing in the chain contradicts the declared sender infrastructure.') +
+        '</span>';
+    }
+  }
+
+  /* ---------------- IOC table ---------------- */
+
+  function renderIocs(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var host = root.querySelector('#trace-ioc-body');
+    var iocs = email.iocs || [];
+    if (!iocs.length) {
+      host.innerHTML = '<p class="trace-empty">No indicators — sender is the domain of record.</p>';
+      return;
+    }
+    host.innerHTML = iocs.map(function (ioc, i) {
+      var pct = Math.round((Number(ioc.confidence) || 0) * 100);
+      return '<div class="ioc-row">' +
+        '<span class="pill" style="flex:0 0 auto">' + esc(ioc.type) + '</span>' +
+        '<span class="ioc-val mono">' + esc(ioc.value) + '</span>' +
+        '<div class="ioc-meter-wrap"><div class="meter"><span class="meter__fill meter__fill--brass" style="width:' + pct + '%"></span></div>' +
+          '<span class="mono" style="font-size:var(--fs-xs);color:var(--text-faint)">' + ctx.fmt.pct(ioc.confidence) + '</span></div>' +
+        '<span class="ioc-src">' + esc(ioc.source) + '</span>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-ioc-copy="' + i + '">Copy</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* ---------------- related campaigns ---------------- */
+
+  function renderCampaigns(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var host = root.querySelector('#trace-campaigns-body');
+    var camps = email.relatedCampaigns || [];
+    if (!camps.length) {
+      host.innerHTML = '<p class="trace-empty">No related campaigns — this sender has no prior corpus matches.</p>';
+      return;
+    }
+    host.innerHTML = camps.map(function (c, i) {
+      var pct = Math.round((Number(c.similarity) || 0) * 100);
+      return '<div class="cmp-row">' +
+        '<div class="cmp-name"><b>' + esc(c.id) + '</b><span class="mono">' + esc(c.name) + '</span></div>' +
+        '<div class="cmp-meter-wrap">' +
+          '<div class="row row--between" style="gap:6px"><span class="muted" style="font-size:var(--fs-xs)">similarity</span>' +
+          '<span class="mono" style="font-size:var(--fs-xs)">' + ctx.fmt.pct(c.similarity) + '</span></div>' +
+          '<div class="meter"><span class="meter__fill" style="width:' + pct + '%"></span></div>' +
+        '</div>' +
+        '<span class="cmp-seen mono" title="' + esc('First seen ' + ctx.fmt.date(c.firstSeen)) + '">' + ctx.fmt.date(c.firstSeen) + '</span>' +
+        '<span class="cmp-count mono">' + ctx.fmt.number(c.count) + ' msgs</span>' +
+        '<button type="button" class="btn btn--ghost btn--sm" data-cmp-pivot="' + i + '">Pivot to campaign</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function doExportIocs(ctx){
+    var email = ctx.email();
+    if (!email) return;
+    var n = (email.iocs || []).length;
+    ctx.toast(n
+      ? n + ' indicator' + (n === 1 ? '' : 's') + ' from ' + email.id + ' exported as CSV.'
+      : 'Nothing to export for ' + email.id + ' — no indicators, the sender is the domain of record.',
+      'IOC export');
+  }
+
+  /* ---------------- raw headers ---------------- */
+
+  /* Each Received block is attributed to the first hop whose text contains its
+     bracketed IP literal or its host. Block count and hop count differ per
+     sample (EM-2409 has four hops in three blocks), so never map by position. */
+  function classifyRawLines(email){
+    var lines = email.rawHeaders.split('\n');
+    var hops = email.hops;
+    var blocks = [], cur = -1, map = lines.map(function () { return []; });
+
+    lines.forEach(function (line, i) {
+      if (/^Received:/i.test(line)) { cur = blocks.length; blocks.push([i]); }
+      else if (cur >= 0 && /^\s/.test(line) && line.trim() !== '') { blocks[cur].push(i); }
+      else { cur = -1; }
+    });
+
+    hops.forEach(function (h, hi) {
+      var block = blocks.find(function (b) {
+        var text = b.map(function (li) { return lines[li]; }).join(' ');
+        return text.indexOf('[' + h.ip + ']') >= 0 || text.indexOf(h.host) >= 0;
+      });
+      if (block) block.forEach(function (li) { map[li].push(hi); });
+    });
+
+    return { lines: lines, map: map };
+  }
+
+  function renderRawHeaders(ctx, email){
+    var esc = ctx.fmt.escapeHtml;
+    var pre = root.querySelector('#trace-raw-headers');
+    var state = classifyRawLines(email);
+    pre.innerHTML = state.lines.map(function (line, i) {
+      return '<span class="raw-line" data-hops="' + state.map[i].join(' ') + '">' + esc(line) + '</span>\n';
+    }).join('');
+  }
+
+  function highlightRawHeaders(hopIndex){
+    var pre = root.querySelector('#trace-raw-headers');
+    var want = String(hopIndex);
+    pre.querySelectorAll('span.raw-line').forEach(function (s) {
+      s.classList.toggle('hl', hopIndex >= 0 && s.dataset.hops.split(' ').indexOf(want) >= 0);
+    });
+  }
+
+  window.__screens.push(['trace', {
+    mount: function (r, ctx) {
+      root = r;
+
+      root.querySelector('#trace-btn-export-ioc-2').addEventListener('click', function () { doExportIocs(ctx); });
+      root.querySelector('#trace-btn-copy-headers').addEventListener('click', function () {
+        var email = ctx.email();
+        if (!email) return;
+        ctx.toast('Raw source for ' + email.id + ' copied to clipboard (' +
+          String(email.rawHeaders || '').length + ' chars).', 'Copied');
+      });
+
+      /* delegated hover/focus wiring for the raw-header highlight */
+      root.querySelector('#trace-hop-tbody').addEventListener('mouseover', function (e) {
+        var row = e.target.closest('tr.trace-hop-row');
+        if (row) highlightRawHeaders(parseInt(row.getAttribute('data-hop-index'), 10));
+      });
+      root.querySelector('#trace-hop-tbody').addEventListener('mouseout', function () { highlightRawHeaders(-1); });
+      root.querySelector('#trace-hop-tbody').addEventListener('focusin', function (e) {
+        var row = e.target.closest('tr.trace-hop-row');
+        if (row) highlightRawHeaders(parseInt(row.getAttribute('data-hop-index'), 10));
+      });
+      root.querySelector('#trace-hop-tbody').addEventListener('focusout', function () { highlightRawHeaders(-1); });
+
+      /* delegated click wiring for IOC copy and campaign pivot buttons */
+      root.querySelector('#trace-ioc-body').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-ioc-copy]');
+        if (!btn) return;
+        var ioc = (ctx.email().iocs || [])[parseInt(btn.getAttribute('data-ioc-copy'), 10)];
+        if (ioc) ctx.toast(ioc.type + ': ' + ioc.value, 'IOC copied');
+      });
+      root.querySelector('#trace-campaigns-body').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-cmp-pivot]');
+        if (!btn) return;
+        var c = (ctx.email().relatedCampaigns || [])[parseInt(btn.getAttribute('data-cmp-pivot'), 10)];
+        if (c) ctx.toast('Pivoting to ' + c.id + ' — ' + c.count + ' linked messages across the corpus.', 'Campaign view');
+      });
+    },
+    onSelect: function (email, ctx) {
+      renderMap(ctx, email);
+      renderOrigin(ctx, email);
+      renderHopTable(ctx, email);
+      renderContradiction(ctx, email);
+      renderIocs(ctx, email);
+      renderCampaigns(ctx, email);
+      renderRawHeaders(ctx, email);
+    }
+  }]);
+})();</script>
